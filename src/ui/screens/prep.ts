@@ -6,7 +6,6 @@ import {
   buyOffer, doReroll, isBossWave, offerPrice, rerollCost,
   sellCell, wavesTotal, type RunState,
 } from '../../sim/run';
-import { GRID_CELLS } from '../../sim/grid';
 import { button, clear, currency, el, iconEl, screen, toast } from '../dom';
 import { t, tk } from '../i18n';
 import {
@@ -186,7 +185,7 @@ export function mountPrep(ctx: AppContext): () => void {
     clear(detailBox);
     if (!diff) {
       detailBox.append(
-        el('h3', { text: t('equipment') }),
+        el('h3', { text: t('effect') }),
         el('div', { class: 'muted tiny', text: t('tapToPlace') }),
       );
       return;
@@ -239,7 +238,7 @@ export function mountPrep(ctx: AppContext): () => void {
   const cancelBtn = button(t('cancel'), () => cancelPending(), { class: 'ghost sm' });
 
   const startBtn = button(boss ? `${t('startWave')} · ${t('bossWave')}` : t('startWave'), () => {
-    if (hasNoWeapon(run!.slots)) { audio.play('deny'); toast(t('weapons')); return; }
+    if (hasNoWeapon(run!.slots)) { audio.play('deny'); toast(t('needWeapon')); return; }
     app.startWave();
   }, { class: 'primary wide' });
 
@@ -261,23 +260,25 @@ export function mountPrep(ctx: AppContext): () => void {
     requestAnimationFrame(() => panel.relayout());
   }
 
-  const left = el('div', { class: 'col' },
+  // Three blocks. In portrait they stack in DOM order — panel, then shop, so
+  // the offers are on screen without scrolling past the explanation. On a wide
+  // screen CSS grid puts the shop in its own column beside both.
+  const panelBlock = el('div', { class: 'prep-panel col' },
     el('h3', { text: t('equipment') }),
     panel.root,
     hintBox,
     el('div', { class: 'row', style: 'justify-content:center;gap:6px' }, sellBtn, cancelBtn),
-    comboBox,
-    detailBox,
   );
-  const right = el('div', { class: 'col' },
+  const shopBlock = el('div', { class: 'prep-shop col' },
     el('div', { class: 'row' },
       el('h3', { text: t('shop'), style: 'flex:1;margin:0' }),
       rerollBtn,
     ),
     offersBox,
   );
+  const infoBlock = el('div', { class: 'prep-info col' }, detailBox, comboBox);
 
-  s.body.append(el('div', { class: 'two-col' }, left, right));
+  s.body.append(el('div', { class: 'prep-layout' }, panelBlock, shopBlock, infoBlock));
   s.foot.append(startBtn);
   ui.append(s.root);
 
@@ -287,8 +288,6 @@ export function mountPrep(ctx: AppContext): () => void {
 
   const onResize = () => panel.relayout();
   window.addEventListener('resize', onResize);
-  void GRID_CELLS;
-  void SHOP;
 
   return () => {
     window.removeEventListener('resize', onResize);

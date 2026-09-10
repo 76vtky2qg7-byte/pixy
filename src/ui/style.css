@@ -186,8 +186,10 @@ h3 { margin: 0 0 4px; font-size: 14px; color: var(--text-dim); letter-spacing: .
  * ------------------------------------------------------------------ */
 .panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
-  width: min(230px, 62vw);
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  /* Small enough that the shop below it is on screen without scrolling on a
+     phone; the cells still clear the 44px comfortable-touch minimum. */
+  width: min(190px, 48vw);
 }
 .cell {
   position: relative; aspect-ratio: 1; display: flex;
@@ -212,26 +214,60 @@ h3 { margin: 0 0 4px; font-size: 14px; color: var(--text-dim); letter-spacing: .
 @keyframes pulse { 50% { border-color: var(--amber); } }
 
 .cell .ico { width: 44px; height: 44px; background-size: 308px 88px; }
+@media (max-width: 400px) { .cell .ico { width: 40px; height: 40px; } }
 .cell-idx {
   position: absolute; bottom: 2px; left: 4px; font-size: 11px; color: var(--text-dim);
 }
 
 /* Link marks drawn between orthogonally adjacent cells. */
+/* The bar sits in the gutter BETWEEN two cells. Because a bar can only ever
+   appear in a gutter, the picture itself says diagonals are not connections. */
 .link {
-  position: absolute; background: var(--good); opacity: .85; pointer-events: none;
-  border-radius: 2px; z-index: 2;
+  position: absolute; background: var(--good); pointer-events: none;
+  border-radius: 3px; z-index: 3;
+  box-shadow: 0 0 7px rgba(89, 217, 141, .85);
+}
+
+/* ------------------------------------------------------------------ *
+ * preparation screen layout
+ *
+ * Portrait stacks panel -> shop -> explanation, so the offers are reachable
+ * without scrolling past anything. A wide screen gives the shop its own column
+ * beside the panel and the explanation instead.
+ * ------------------------------------------------------------------ */
+.prep-layout { display: flex; flex-direction: column; gap: 10px; }
+
+@media (min-width: 720px) and (orientation: landscape) {
+  .prep-layout {
+    display: grid;
+    grid-template-columns: minmax(230px, 310px) 1fr;
+    grid-template-areas: "panel shop" "info shop";
+    gap: 14px 18px;
+    align-items: start;
+  }
+  .prep-panel { grid-area: panel; }
+  .prep-shop  { grid-area: shop; }
+  .prep-info  { grid-area: info; }
+  .prep-layout .grid { width: min(210px, 100%); }
+  /* Eight combination pills in a narrow column would push everything else off
+     screen; shrink them so the whole set is visible at a glance. */
+  .prep-info .pill { font-size: 12px; padding: 3px 7px; }
 }
 
 /* ------------------------------------------------------------------ *
  * shop
  * ------------------------------------------------------------------ */
-.offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 8px; }
+.offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(206px, 1fr)); gap: 8px; }
 .offer { display: flex; gap: 8px; align-items: flex-start; }
-.offer .meta { flex: 1; min-width: 0; }
+.offer .meta { flex: 1 1 auto; min-width: 0; }
 .offer .name { font-size: 14px; line-height: 1.2; }
 .offer .desc { font-size: 12px; color: var(--text-dim); line-height: 1.25; }
 .offer.sold { opacity: .45; }
-.price { display: inline-flex; align-items: center; gap: 4px; color: var(--amber-lt); font-size: 14px; }
+/* The price and the buy button must wrap rather than overlap the description
+   when a card is narrow. */
+.offer .meta > .row { flex-wrap: wrap; justify-content: flex-end; }
+.offer .meta > .row .price { margin-right: auto; }
+.price { display: inline-flex; align-items: center; gap: 4px; color: var(--amber-lt); font-size: 14px; white-space: nowrap; }
 .price.cant { color: var(--danger); }
 
 /* Before/after comparison shown while choosing where to place a part. */
@@ -293,16 +329,31 @@ h3 { margin: 0 0 4px; font-size: 14px; color: var(--text-dim); letter-spacing: .
 .heat-chip.hot { border-color: var(--danger); animation: pulse .5s infinite; }
 .heat-chip .ico { position: absolute; left: 1px; top: 3px; width: 22px; height: 22px; background-size: 154px 44px; }
 
-.hud-boss { position: absolute; top: calc(64px + var(--safe-t)); left: 12%; right: 12%; }
+/* Centred and capped: a boss bar spanning a whole desktop screen reads as a
+   line rather than as a gauge, the same problem the health bar had. */
+.hud-boss {
+  position: absolute; top: calc(66px + var(--safe-t));
+  left: 50%; transform: translateX(-50%);
+  width: min(520px, 76%);
+}
 .hud-boss .label { text-align: center; font-size: 12px; color: var(--danger); letter-spacing: .2em; }
 
 .btn-pause {
   width: var(--tap); height: var(--tap); flex: 0 0 auto; padding: 0; font-size: 18px;
 }
 
-.hud-scrap {
-  position: absolute; top: calc(6px + var(--safe-t)); left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px;
+.hud-scrap { display: flex; gap: 6px; margin-top: 2px; }
+.hud-scrap .pill { padding: 2px 8px; font-size: 13px; }
+
+/* Off-screen boss marker: a triangle pinned to the edge, pointing at it. */
+.boss-arrow { position: absolute; width: 26px; height: 26px; pointer-events: none; z-index: 12; }
+.boss-arrow i {
+  display: block; width: 0; height: 0; margin: 3px 0 0 4px;
+  border-left: 16px solid var(--danger);
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  filter: drop-shadow(0 0 5px rgba(224, 74, 60, .9));
+  animation: pulse 1s infinite;
 }
 
 /* Virtual stick, drawn where the thumb landed. */

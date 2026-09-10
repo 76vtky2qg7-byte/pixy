@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Pix, grid } from './pixlib.mjs';
+import { Pix, grid, mulberry } from './pixlib.mjs';
 import * as A from './art/actors.mjs';
 import * as W from './art/world.mjs';
 import * as I from './art/icons.mjs';
@@ -99,6 +99,22 @@ write('glyphs', grid([I.glyphScrap(), I.glyphCredit(), I.glyphHeart()], 14, 14, 
 /* ---- number font: 7x9 ---- */
 write('digits', grid(I.DIGIT_CHARS.map((c) => I.digitGlyph(c)), 7, 9, I.DIGIT_CHARS.length), 7, 9);
 fs.writeFileSync(path.join(OUT, 'digits.chars.json'), JSON.stringify(I.DIGIT_CHARS));
+
+/* ---- cover floor: a single repeatable 4x4 patch of the sorting-floor tiles.
+       CSS cannot crop one frame out of a spritesheet and repeat it, so the
+       store art needs a purpose-built seamless tile. ---- */
+const coverFloor = new Pix(128, 128);
+{
+  const rnd = mulberry(20260910);
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const r = rnd();
+      const v = r < 0.72 ? 0 : r < 0.86 ? 1 : r < 0.94 ? 2 : 3;
+      coverFloor.blit(W.floorTile('sorting', v), x * 32, y * 32);
+    }
+  }
+}
+write('cover_floor', coverFloor, 128, 128);
 
 /* ---- store icon: composed scene, upscaled to 512 ---- */
 function upscale(src, n) {

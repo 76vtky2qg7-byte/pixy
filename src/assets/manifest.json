@@ -97,6 +97,13 @@
     "frameH": 9,
     "frames": 14
   },
+  "cover_floor": {
+    "w": 128,
+    "h": 128,
+    "frameW": 128,
+    "frameH": 128,
+    "frames": 1
+  },
   "store_icon": {
     "w": 512,
     "h": 512,

@@ -268,8 +268,11 @@ export class EquipmentPanel {
     if (!this.cells[0]) return;
 
     const seen = new Set<string>();
-    const gridRect = this.gridEl.getBoundingClientRect();
-    if (gridRect.width === 0) return;   // not laid out yet
+    // Bars are appended to `root`, which is the positioned ancestor, so their
+    // offsets must be measured against it — not against the grid, which is
+    // narrower and centred inside it.
+    const rootRect = this.root.getBoundingClientRect();
+    if (rootRect.width === 0) return;   // not laid out yet
 
     for (const p of pairs) {
       const a = Math.min(p.cell, p.moduleCell), b = Math.max(p.cell, p.moduleCell);
@@ -283,15 +286,15 @@ export class EquipmentPanel {
       const horizontal = Math.abs(ra.top - rb.top) < 2;
       const bar = el('i', { class: 'link' });
       if (horizontal) {
-        bar.style.left = `${ra.right - gridRect.left}px`;
-        bar.style.top = `${ra.top + ra.height / 2 - gridRect.top - 2}px`;
-        bar.style.width = `${Math.max(2, rb.left - ra.right)}px`;
-        bar.style.height = '4px';
+        bar.style.left = `${ra.right - rootRect.left}px`;
+        bar.style.top = `${ra.top + ra.height / 2 - rootRect.top - 3}px`;
+        bar.style.width = `${Math.max(3, rb.left - ra.right)}px`;
+        bar.style.height = '6px';
       } else {
-        bar.style.left = `${ra.left + ra.width / 2 - gridRect.left - 2}px`;
-        bar.style.top = `${ra.bottom - gridRect.top}px`;
-        bar.style.height = `${Math.max(2, rb.top - ra.bottom)}px`;
-        bar.style.width = '4px';
+        bar.style.left = `${ra.left + ra.width / 2 - rootRect.left - 3}px`;
+        bar.style.top = `${ra.bottom - rootRect.top}px`;
+        bar.style.height = `${Math.max(3, rb.top - ra.bottom)}px`;
+        bar.style.width = '6px';
       }
       this.links.push(bar);
       this.root.append(bar);

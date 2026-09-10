@@ -424,13 +424,11 @@ export class World {
 
   private moveToward(e: Enemy, tx: number, ty: number, dt: number, scale = 1): void {
     const dx = tx - e.x, dy = ty - e.y;
-    const d = Math.hypot(dx, dy) || 1;
-    // jitter fans a crowd out into an arc instead of a single-file queue
+    // Jitter fans a crowd out into an arc instead of a single-file queue.
     const a = Math.atan2(dy, dx) + e.jitter * 0.35;
     e.x += Math.cos(a) * e.speed * scale * dt;
     e.y += Math.sin(a) * e.speed * scale * dt;
     e.facing = dx > 0 ? 1 : -1;
-    void d;
   }
 
   private stepEnemyAi(e: Enemy, dt: number): void {
@@ -757,10 +755,10 @@ export class World {
       this.addHeat(w, rt.heatGain);
 
       switch (def.behaviour) {
-        case 'bolt':  this.fireBolt(w, rt, target!, odDmg); break;
-        case 'chain': this.fireChain(w, rt, target!, odDmg); break;
-        case 'mortar': this.fireMortar(w, rt, odDmg); break;
-        case 'slam':  this.fireSlam(w, rt, odDmg); break;
+        case 'bolt':  this.fireBolt(rt, target!, odDmg); break;
+        case 'chain': this.fireChain(rt, target!, odDmg); break;
+        case 'mortar': this.fireMortar(rt, odDmg); break;
+        case 'slam':  this.fireSlam(rt, odDmg); break;
       }
     }
   }
@@ -794,7 +792,7 @@ export class World {
   }
 
   // --- bolt: fast projectile at the nearest target, fanned when multi-shot ---
-  private fireBolt(w: WeaponState, rt: WeaponRuntime, target: Enemy, odDmg: number): void {
+  private fireBolt(rt: WeaponRuntime, target: Enemy, odDmg: number): void {
     const baseA = Math.atan2(target.y - this.py, target.x - this.px);
     const n = rt.projectiles;
     const spread = n > 1 ? 0.16 : 0;
@@ -818,11 +816,10 @@ export class World {
       p.angle = a;
       p.pierce = 0;
     }
-    void w;
   }
 
   // --- chain: instant hitscan that jumps to further targets ---
-  private fireChain(w: WeaponState, rt: WeaponRuntime, target: Enemy, odDmg: number): void {
+  private fireChain(rt: WeaponRuntime, target: Enemy, odDmg: number): void {
     const hit = new Set<number>();
     let from = { x: this.px, y: this.py };
     let cur: Enemy | null = target;
@@ -839,11 +836,10 @@ export class World {
       dmg *= 0.62;   // each jump is weaker, so chains cannot spiral
       cur = next;
     }
-    void w;
   }
 
   // --- mortar: lobbed shell at the densest nearby cluster ---
-  private fireMortar(w: WeaponState, rt: WeaponRuntime, odDmg: number): void {
+  private fireMortar(rt: WeaponRuntime, odDmg: number): void {
     const target = this.densestCluster(rt.range, rt.area);
     if (!target) return;
     for (let i = 0; i < rt.projectiles; i++) {
@@ -870,7 +866,6 @@ export class World {
       p.scrapBonus = rt.scrapBonus;
       p.angle = a;
     }
-    void w;
   }
 
   /** Centre of the tightest knot of enemies inside `range`. */
@@ -894,7 +889,7 @@ export class World {
   }
 
   // --- slam: instant ring of damage centred on the robot ---
-  private fireSlam(w: WeaponState, rt: WeaponRuntime, odDmg: number): void {
+  private fireSlam(rt: WeaponRuntime, odDmg: number): void {
     this.events.push({ t: 'slam', x: this.px, y: this.py, radius: rt.area });
     this.enemyHash.query(this.px, this.py, rt.area, this.scratch);
     for (const e of [...this.scratch]) {
@@ -904,7 +899,6 @@ export class World {
       if (d > rt.area) continue;
       this.damageEnemy(e, rt.damage * odDmg, rt.armorPierce, dx / d, dy / d, rt.knockback, rt.scrapBonus);
     }
-    void w;
   }
 
   // --- orbit: blades that circle the robot and re-hit on a timer ---

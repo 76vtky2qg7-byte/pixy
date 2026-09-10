@@ -1,4 +1,4 @@
-import { CONTRACTS, contractEffects, type ContractDef } from '../../config/contracts';
+import { CONTRACTS, type ContractDef } from '../../config/contracts';
 import { ROBOTS, ROBOT_IDS, type RobotId } from '../../config/robots';
 import type { AppContext } from '../app';
 import { button, currency, el, screen, toast } from '../dom';
@@ -34,7 +34,6 @@ export function mountContracts(ctx: AppContext): () => void {
     contractList.replaceChildren();
     for (const c of CONTRACTS) {
       const unlocked = isUnlocked(c);
-      const eff = contractEffects(c);
       const best = d.progress.bestWave[c.id] ?? 0;
       const won = d.progress.wonContracts.includes(c.id);
 
@@ -67,7 +66,6 @@ export function mountContracts(ctx: AppContext): () => void {
           : el('div', { class: 'muted tiny', text: t('noRules') }),
       );
       card.append(rules);
-      void eff;
 
       if (!unlocked) {
         card.append(el('div', { class: 'tiny', style: 'color:var(--danger);margin-top:6px', text: `${t('locked')} — ${t('lockedHint')}` }));

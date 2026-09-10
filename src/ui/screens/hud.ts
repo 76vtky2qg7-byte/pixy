@@ -2,7 +2,7 @@ import { audio } from '../../audio/audio';
 import { HEAT, PLAYER } from '../../config/balance';
 import { WEAPONS } from '../../config/gear';
 import type { AppContext } from '../app';
-import { isBossWave, runContract, wavesTotal } from '../../sim/run';
+import { isBossWave, wavesTotal } from '../../sim/run';
 import { button, confirmDialog, currency, el } from '../dom';
 import { t, tk } from '../i18n';
 
@@ -14,13 +14,12 @@ import { t, tk } from '../i18n';
  * expensive thing on screen.
  */
 export function mountHud(ctx: AppContext): () => void {
-  const { app, save, ui } = ctx;
+  const { app, ui } = ctx;
   const world = app.world;
   const run = app.run;
   if (!world || !run) { app.show('menu'); return () => {}; }
 
   const boss = isBossWave(run);
-  const settings = save.get().settings;
 
   /* ---- top bar: health, overdrive, wave, pause ---- */
   const hpFill = el('i');
@@ -36,17 +35,17 @@ export function mountHud(ctx: AppContext): () => void {
   const pauseBtn = button('II', () => openPause(), { class: 'btn-pause' });
   pauseBtn.setAttribute('aria-label', t('pause'));
 
+  /* ---- scrap counter, under the bars so it never covers the HP text ---- */
+  const scrapCount = el('span', { class: 'pill amber' }, currency('scrap'), el('b', { text: '0' }));
+  const scrapValue = scrapCount.querySelector('b')!;
+  const scrapRow = el('div', { class: 'hud-scrap' }, scrapCount);
+
   const top = el('div', { class: 'hud-top' },
-    el('div', { class: 'hud-bars' }, hpBar, odBar),
+    el('div', { class: 'hud-bars' }, hpBar, odBar, scrapRow),
     el('div', { class: 'hud-wave' }, timer, waveLabel),
     pauseBtn,
   );
   pauseBtn.classList.add('tappable');
-
-  /* ---- scrap counter ---- */
-  const scrapCount = el('span', { class: 'pill amber' }, currency('scrap'), el('b', { text: '0' }));
-  const scrapValue = scrapCount.querySelector('b')!;
-  const scrapRow = el('div', { class: 'hud-scrap' }, scrapCount);
 
   /* ---- boss bar ---- */
   const bossFill = el('i');
@@ -54,6 +53,11 @@ export function mountHud(ctx: AppContext): () => void {
   const bossBox = el('div', { class: 'hud-boss' },
     el('div', { class: 'label', text: t('boss') }), bossBar);
   bossBox.style.display = 'none';
+
+  // A boss slower than the robot is easy to outrun straight off the screen.
+  // Without a pointer the player has no way to find it again.
+  const bossArrow = el('div', { class: 'boss-arrow' }, el('i'));
+  bossArrow.style.display = 'none';
 
   /* ---- heat chips, one per installed weapon ---- */
   const heatRow = el('div', { class: 'hud-heat' });
@@ -78,7 +82,7 @@ export function mountHud(ctx: AppContext): () => void {
   const stickLayer = el('div', { id: 'stick' }, stickBase, stickKnob);
   stickBase.style.display = stickKnob.style.display = 'none';
 
-  const hud = el('div', { id: 'hud' }, top, scrapRow, bossBox, heatRow, stickLayer);
+  const hud = el('div', { id: 'hud' }, top, bossBox, bossArrow, heatRow, stickLayer);
   ui.append(hud);
 
   /* ---- per-frame update ---- */
@@ -115,8 +119,10 @@ export function mountHud(ctx: AppContext): () => void {
       if (b) {
         bossBox.style.display = '';
         bossFill.style.width = `${Math.max(0, (b.hp / b.maxHp) * 100)}%`;
+        updateBossArrow(b.x, b.y);
       } else {
         bossBox.style.display = 'none';
+        bossArrow.style.display = 'none';
       }
       timer.textContent = '';
       waveLabel.textContent = t('bossWave');
@@ -154,6 +160,32 @@ export function mountHud(ctx: AppContext): () => void {
       stickBase.style.display = stickKnob.style.display = 'none';
     }
   });
+
+  /**
+   * Pin a marker to the screen edge in the boss's direction whenever it is off
+   * screen, so it can always be found again.
+   */
+  function updateBossArrow(bx: number, by: number): void {
+    const rect = hud.getBoundingClientRect();
+    const p = app.scene.worldToScreen(bx, by);
+    const margin = 34;
+    const inside = p.x >= 0 && p.y >= 0 && p.x <= rect.width && p.y <= rect.height;
+    if (inside) { bossArrow.style.display = 'none'; return; }
+
+    const cx = rect.width / 2, cy = rect.height / 2;
+    const dx = p.x - cx, dy = p.y - cy;
+    const angle = Math.atan2(dy, dx);
+    // Push the marker out to whichever edge the direction hits first.
+    const halfW = Math.max(10, cx - margin), halfH = Math.max(10, cy - margin);
+    const scale = Math.min(
+      Math.abs(halfW / (Math.cos(angle) || 1e-6)),
+      Math.abs(halfH / (Math.sin(angle) || 1e-6)),
+    );
+    bossArrow.style.display = '';
+    bossArrow.style.left = `${cx + Math.cos(angle) * scale}px`;
+    bossArrow.style.top = `${cy + Math.sin(angle) * scale}px`;
+    bossArrow.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+  }
 
   /* ---- pause menu ---- */
   let pauseNode: HTMLElement | null = null;
@@ -205,11 +237,11 @@ export function mountHud(ctx: AppContext): () => void {
   // The game screen owns 'menu' only while its own pause card is open.
   app.pause.clear('menu');
   app.tutorial.trigger('move');
-  setTimeout(() => app.tutorial.trigger('survive'), 12_000);
-  void runContract;
-  void settings;
+  const surviveHint = setTimeout(() => app.tutorial.trigger('survive'), 12_000);
 
   return () => {
+    // The delayed hint must not fire into a screen that no longer exists.
+    clearTimeout(surviveHint);
     window.removeEventListener('keydown', onKey);
     app.setHudUpdater(null);
     pauseNode?.remove();
