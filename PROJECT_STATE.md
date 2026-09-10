@@ -124,6 +124,8 @@ npx vite-node tools/sim/report.ts   # таблицы для BALANCE.md
 - **FPS замерен**: 60 при обычной игре, 58–60 при удержании на потолке в 90
   врагов. Условия замера описаны в `TEST_REPORT.md` — это headless Chromium с
   программным рендерингом, не телефон.
+- **Сборка воспроизводится из чистого клона**: `npm ci` → `npm run build` →
+  `npm test` → `node tools/pack.mjs` даёт тот же архив на 426 КБ.
 
 ---
 

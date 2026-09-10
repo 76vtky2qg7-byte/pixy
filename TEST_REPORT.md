@@ -173,6 +173,13 @@ gets a working game.**
 Serving from a nested path is what actually proves `base: './'` works; serving
 from a domain root would have hidden an absolute-path bug.
 
+### Reproducible from a clean clone
+
+The pushed branch was cloned fresh into an empty directory and taken through
+`npm ci`, `npm run build`, `npm test` and `node tools/pack.mjs`. All 104 unit
+tests pass and the packer produces a byte-identical 426 KB archive, so nothing
+in the result depends on state left behind in the development directory.
+
 ---
 
 ## 4. Screens inspected visually
