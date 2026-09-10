@@ -112,11 +112,20 @@ export async function playFor(page, seconds, key = 'KeyD') {
   await page.keyboard.up(key);
 }
 
-/** Force the current wave to end with the given outcome, without waiting it out. */
+/**
+ * Force the current wave to end with the given outcome, without waiting it out.
+ *
+ * Waits for the world to exist first: starting a wave is asynchronous, and
+ * forcing before the simulation is constructed silently does nothing and leaves
+ * the caller stuck on the game screen. Then polls for the screen to actually
+ * change rather than sleeping a fixed amount, so a slow frame does not read as
+ * a failure.
+ */
 export async function forceWave(page, outcome) {
+  await page.waitForFunction(() => !!window.__app?.world, null, { timeout: 10000 });
+
   await page.evaluate((o) => {
-    const w = window.__app?.world;
-    if (!w) return;
+    const w = window.__app.world;
     if (o === 'cleared') {
       w.timeLeft = 0.01;
       w.spawnBudget = 0;
@@ -129,7 +138,14 @@ export async function forceWave(page, outcome) {
       w.events.push({ t: 'playerDown' });
     }
   }, outcome);
-  await page.waitForTimeout(1400);
+
+  // The wave-end sweep runs for WAVE.endOfWaveSweepSeconds before the screen
+  // changes, and mounting the next screen is a dynamic import.
+  await page.waitForFunction(
+    () => window.__app.screen === 'prep' || window.__app.screen === 'results',
+    null, { timeout: 15000 },
+  ).catch(() => {});
+  await page.waitForTimeout(120);
 }
 
 export class Report {

@@ -3,7 +3,7 @@
 Three layers of checking, in order of how much they prove:
 
 1. **104 unit tests** (`npm test`) — adjacency, economy, saves, pause manager.
-2. **61 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
+2. **62 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
    build**, driven in Chromium, with a fake Yandex SDK injected before boot so
    the **real** shipped adapter is what runs.
 3. **Manual inspection of rendered frames** — screenshots read and judged, which
@@ -55,7 +55,7 @@ write leaves local progress untouched**; conflicts resolve by revision and
 
 ---
 
-## 2. End-to-end checks — 61 passed, 0 failed
+## 2. End-to-end checks — 62 passed, 0 failed
 
 Run against `dist/` served by `vite preview`, in Chromium 1194, at
 390×844 dsf 3 (touch), 360×800, 1366×768 and 844×390.

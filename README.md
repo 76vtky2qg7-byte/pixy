@@ -41,7 +41,7 @@ mkdir -p /tmp/pw && cd /tmp/pw && npm i playwright@1.63.0
 cd -  && ln -sfn /tmp/pw/node_modules/playwright node_modules/playwright \
                  && ln -sfn /tmp/pw/node_modules/playwright-core node_modules/playwright-core
 
-node tools/e2e/run.mjs        # 61 end-to-end checks against the built game
+node tools/e2e/run.mjs        # 62 end-to-end checks against the built game
 node tools/e2e/perf.mjs       # frame-rate measurement
 node tools/store-art.mjs      # regenerate the store cover images
 npx vite-node tools/sim/report.ts   # regenerate the tables in BALANCE.md

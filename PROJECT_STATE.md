@@ -28,7 +28,7 @@ mkdir -p /tmp/pw && (cd /tmp/pw && npm i playwright@1.63.0)
 ln -sfn /tmp/pw/node_modules/playwright node_modules/playwright
 ln -sfn /tmp/pw/node_modules/playwright-core node_modules/playwright-core
 
-node tools/e2e/run.mjs              # 61 сквозная проверка собранной игры
+node tools/e2e/run.mjs              # 62 сквозные проверки собранной игры
 node tools/e2e/perf.mjs             # замер FPS
 node tools/e2e/screenshots.mjs      # скриншоты для карточки
 node tools/store-art.mjs            # обложки
@@ -116,7 +116,7 @@ npx vite-node tools/sim/report.ts   # таблицы для BALANCE.md
 ## Проверено
 
 - **104 модульных теста** — соседство, экономика, сохранения, менеджер пауз.
-- **61 сквозная проверка** production-сборки в Chromium с подставным SDK,
+- **62 сквозные проверки** production-сборки в Chromium с подставным SDK,
   включая все исходы рекламы, 20 переходов волна→магазин→итоги, перезагрузку в
   середине контракта, `pointercancel`, смену языка и размера окна.
 - **Запуск из распакованного ZIP по вложенному пути** — меню, контракт, волна,

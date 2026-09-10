@@ -184,10 +184,12 @@ const note = (errs, label) => {
     }
     await dismissCoach(page);
     const startBtn = page.locator('#ui-root button', { hasText: 'Начать волну' }).first();
+    await startBtn.waitFor({ state: 'visible', timeout: 8000 })
+      .catch(() => { ok = false; detail = `no start button at cycle ${i}`; });
+    if (!ok) break;
     if (!(await startBtn.count())) { ok = false; detail = `no start button at cycle ${i}`; break; }
     if (await startBtn.isDisabled()) { ok = false; detail = `start button stuck disabled at cycle ${i}`; break; }
     await startBtn.click();
-    await page.waitForTimeout(250);
     await forceWave(page, 'cleared');
     const after = await readState(page);
     if (after.screen !== 'prep' && after.screen !== 'results') {
