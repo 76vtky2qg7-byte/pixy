@@ -68,15 +68,24 @@ Secondary: **Action**, **Survival**, **Pixel**
 
 ## Tags
 pixel art, survivor, arcade, robots, waves, build crafting, singleplayer,
-offline, portrait, one-handed
+portrait, one-handed
 
 ## Age rating
 **6+** — cartoon destruction of machinery. No people, no blood, no gore;
 the enemies are machines that come apart into parts.
 
 ## Features
-- Works without sign-in, and offline once loaded
-- Progress saved locally and to the cloud
+- No sign-in required
+- Gameplay keeps working with no network once the page has loaded: contracts,
+  combat, stores, workshop and settings all open and play with the connection
+  off. Reloading the page does, of course, need the network.
+- Progress is saved locally; cloud saving needs the platform to be reachable
 - Russian and English
 - Ads are optional only (doubling your reward) plus one at a natural pause after results
 - No level requires watching an ad
+
+### What needs the platform
+Ads, cloud saves and purchases only work with a reachable network and a
+reachable Yandex SDK. Without them the game still starts and plays in full:
+progress is written locally, ad buttons are hidden or report themselves as
+unavailable, and the purchase section does not appear.

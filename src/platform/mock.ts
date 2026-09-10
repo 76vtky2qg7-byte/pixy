@@ -23,9 +23,11 @@ export class MockPlatform implements Platform {
   private pauseCbs = new Set<() => void>();
   private resumeCbs = new Set<() => void>();
   private cloudSlot: unknown = null;
-  private adInFlight = false;
+  private adOpen = false;
   /** Counts reward grants so a test can prove a double callback pays once. */
   rewardGrants = 0;
+
+  get adVisible(): boolean { return this.adOpen; }
 
   constructor(opts: { adMode?: MockAdMode; lang?: 'ru' | 'en'; delay?: number } = {}) {
     this.adMode = opts.adMode ?? 'rewarded';
@@ -45,15 +47,16 @@ export class MockPlatform implements Platform {
   gameplayStop(): void { /* no host to notify */ }
 
   async showRewarded(hooks?: AdHooks): Promise<RewardedResult> {
-    if (this.adInFlight) return { status: 'unavailable' };
+    if (this.adOpen) return { status: 'unavailable' };
     if (this.adMode === 'unavailable') return { status: 'unavailable' };
-    this.adInFlight = true;
+    this.adOpen = true;
     hooks?.onOpen?.();
     // Ads take over the screen, so the mock announces a host pause the same way.
     for (const cb of this.pauseCbs) cb();
     await new Promise((r) => setTimeout(r, this.delay));
     for (const cb of this.resumeCbs) cb();
-    this.adInFlight = false;
+    this.adOpen = false;
+    hooks?.onClose?.();
 
     switch (this.adMode) {
       case 'closed': return { status: 'closed' };
@@ -69,14 +72,15 @@ export class MockPlatform implements Platform {
   }
 
   async showInterstitial(hooks?: AdHooks): Promise<InterstitialResult> {
-    if (this.adInFlight) return { status: 'unavailable' };
+    if (this.adOpen) return { status: 'unavailable' };
     if (this.adMode === 'unavailable') return { status: 'unavailable' };
-    this.adInFlight = true;
+    this.adOpen = true;
     hooks?.onOpen?.();
     for (const cb of this.pauseCbs) cb();
     await new Promise((r) => setTimeout(r, this.delay));
     for (const cb of this.resumeCbs) cb();
-    this.adInFlight = false;
+    this.adOpen = false;
+    hooks?.onClose?.();
     if (this.adMode === 'error') return { status: 'error' };
     if (this.adMode === 'closed') return { status: 'not_shown' };
     return { status: 'shown' };
@@ -114,6 +118,7 @@ export class MockPlatform implements Platform {
 
 /** Last-resort platform: no host, no ads, no cloud. Everything still plays. */
 export class NullPlatform implements Platform {
+  readonly adVisible = false;
   readonly info: PlatformInfo = {
     name: 'none', lang: 'ru', isMobile: false,
     isAuthorized: false, hasCloudSave: false, hasPurchases: false,

@@ -12,7 +12,12 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
-    assetsInlineLimit: 2048,
+    // Inline every small sprite sheet as a data URI. Two reasons: it removes
+    // the separate request for the icon sheet that CSS references (which is
+    // fetched lazily on first paint and therefore fails on a dropped
+    // connection), and it cuts the request count on a cold mobile load. The
+    // base64 overhead is a few kilobytes.
+    assetsInlineLimit: 8192,
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {

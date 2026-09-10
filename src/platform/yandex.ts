@@ -17,8 +17,25 @@ import type {
  * Nothing here is allowed to block the player.
  */
 
-/** Loader for the host script. Replace only via the documented v2 endpoint. */
-export const YANDEX_SDK_URL = 'https://yandex.ru/games/sdk/v2';
+/**
+ * Where the host SDK is loaded from.
+ *
+ * A build uploaded to Yandex Games as a ZIP is served by the platform, which
+ * exposes the SDK at the ROOT path `/sdk.js`. This is the one absolute path in
+ * the whole project, and it is deliberate: it is a platform endpoint, not a
+ * game asset, so the "everything must be relative" rule that governs our own
+ * files does not apply to it. `./sdk.js` would resolve inside the game's own
+ * directory, where nothing is served.
+ *
+ * `SELF_HOSTED_SDK_URL` is the form documented for a game served from its own
+ * domain instead. It is exported for completeness; this build does not use it.
+ *
+ * Source: the Yandex Games "connection and usage" SDK page, relayed by review.
+ * That page is not reachable from this build environment (see TEST_REPORT.md),
+ * so this could not be re-read first-hand.
+ */
+export const YANDEX_SDK_URL = '/sdk.js';
+export const SELF_HOSTED_SDK_URL = 'https://sdk.games.s3.yandex.net/sdk.js';
 
 /** Product ids. Both are optional extras; absent catalogue means hidden UI. */
 export const PRODUCT_IDS = { cosmetics: 'foreman_kit', adFree: 'no_forced_ads' } as const;
@@ -28,15 +45,34 @@ export const PRODUCT_IDS = { cosmetics: 'foreman_kit', adFree: 'no_forced_ads' }
 type Ysdk = SDK<false>;
 
 /**
- * Two watchdogs, because "the SDK went quiet" has two distinct shapes.
- *
- * OPEN_TIMEOUT_MS: no onOpen at all means no ad is coming. Give up quickly —
- * the player is staring at a stalled button.
- * AD_TIMEOUT_MS: the ad opened but never reported a close. Wait longer, since
- * a real video is playing, but never wait forever.
+ * How long to wait for an ad to appear before telling the UI none is coming.
+ * This only settles the promise; it never releases the pause, because the
+ * pause is only ever taken once an ad has actually opened.
  */
 const OPEN_TIMEOUT_MS = 6_000;
-const AD_TIMEOUT_MS = 45_000;
+
+/**
+ * Last-resort release for an ad that opened and never closed.
+ *
+ * Deliberately far longer than any real ad. It does not mean "the ad finished"
+ * — it is the point at which a permanently paused, unplayable game is the
+ * worse outcome. `game_api_resume` is the real recovery path; this is the
+ * backstop for a host that provides neither signal.
+ */
+const ORPHAN_RELEASE_MS = 180_000;
+
+interface AdSession {
+  id: number;
+  kind: 'rewarded' | 'interstitial';
+  hooks: AdHooks | undefined;
+  opened: boolean;
+  closed: boolean;
+  rewarded: boolean;
+  /** Whether the promise handed to the UI has already resolved. */
+  settled: boolean;
+  openTimer: ReturnType<typeof setTimeout> | null;
+  liveTimer: ReturnType<typeof setTimeout> | null;
+}
 
 export function loadYandexSdk(timeoutMs = 12_000): Promise<Ysdk | null> {
   return new Promise((resolve) => {
@@ -75,8 +111,18 @@ export class YandexPlatform implements Platform {
   private readyCalled = false;
   private gameplayOn = false;
   private offs: Array<() => void> = [];
-  /** Only one ad call may be in flight; a second tap must not open a second ad. */
-  private adInFlight = false;
+  /**
+   * Every request that has not finished yet. A request whose open window
+   * lapsed stays here — it may still open late — but it no longer blocks a
+   * retry, because otherwise a silent host would disable the ad button for
+   * the rest of the session.
+   */
+  private sessions = new Set<AdSession>();
+  private sessionCounter = 0;
+  /** How many ads are on screen. The pause tracks 0 -> 1 and 1 -> 0. */
+  private openCount = 0;
+  /** Ads that opened and never reported a close; surfaced for diagnostics. */
+  abandoned = 0;
 
   private constructor(sdk: Ysdk, info: PlatformInfo) {
     this.sdk = sdk;
@@ -119,6 +165,7 @@ export class YandexPlatform implements Platform {
       info.hasPurchases = false;
     }
 
+    p.watchHostResume();
     return p;
   }
 
@@ -140,87 +187,189 @@ export class YandexPlatform implements Platform {
     try { this.sdk.features.GameplayAPI.stop(); } catch { /* optional */ }
   }
 
+  /* ------------------------------------------------------------------ *
+   * ads
+   *
+   * One request creates one AdSession. The session — not the promise — owns
+   * the on-screen state, because those two genuinely differ:
+   *
+   *   - the promise must settle so the button stops spinning, even when the
+   *     host says nothing;
+   *   - the pause must last exactly as long as the ad is visible, which can
+   *     start after the promise settled and end long after that.
+   *
+   * Nothing here assumes callbacks arrive in a particular order, arrive at
+   * all, or arrive only once, and there is no attempt to cancel a request:
+   * the SDK offers no cancellation and none is invented.
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Start a session, refusing to overlap with one that is still live.
+   * Returns null when a request must not be made right now.
+   */
+  private beginSession(kind: 'rewarded' | 'interstitial', hooks?: AdHooks): AdSession | null {
+    for (const live of this.sessions) {
+      if (live.closed) continue;
+      // An ad is on screen: a second request would stack two ads.
+      if (live.opened) return null;
+      // Still inside its open window: the host may be about to show it.
+      if (live.openTimer) return null;
+      // Otherwise the window lapsed with nothing shown. Allow the retry, and
+      // leave the stale session tracked so a late open still pauses properly.
+    }
+    const session: AdSession = {
+      id: ++this.sessionCounter,
+      kind,
+      hooks,
+      opened: false,
+      closed: false,
+      rewarded: false,
+      settled: false,
+      openTimer: null,
+      liveTimer: null,
+    };
+    this.sessions.add(session);
+    return session;
+  }
+
+  /** The ad is on screen. Idempotent: a repeated onOpen pauses only once. */
+  private markOpen(session: AdSession): void {
+    if (session.opened || session.closed) return;
+    session.opened = true;
+    if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null; }
+
+    // A late open — after the promise already resolved 'unavailable' — still
+    // has to pause, because an ad really is covering the screen now. Counting
+    // opens rather than tracking one slot also means that if a host somehow
+    // shows two, the pause survives the first close.
+    this.openCount++;
+    if (this.openCount === 1) session.hooks?.onOpen?.();
+
+    // Last-resort recovery from a host that opens an ad and then stops
+    // talking. This is NOT "the ad probably finished": it is the point past
+    // which staying paused forever is worse for the player than resuming.
+    session.liveTimer = setTimeout(() => {
+      this.abandoned++;
+      this.endSession(session);
+    }, ORPHAN_RELEASE_MS);
+  }
+
+  /** The ad is gone. Idempotent, and the only thing that releases the pause. */
+  private endSession(session: AdSession): void {
+    if (session.closed) return;
+    session.closed = true;
+    if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null; }
+    if (session.liveTimer) { clearTimeout(session.liveTimer); session.liveTimer = null; }
+    if (session.opened) {
+      this.openCount = Math.max(0, this.openCount - 1);
+      if (this.openCount === 0) session.hooks?.onClose?.();
+    }
+    this.sessions.delete(session);
+  }
+
+  /** True while an ad is actually displayed. */
+  get adVisible(): boolean {
+    return this.openCount > 0;
+  }
+
+  /**
+   * A host `game_api_resume` means the game regained the foreground, which is
+   * what happens when an ad overlay goes away. Treating it as a close signal
+   * recovers the pause when onClose itself is lost — a real signal rather than
+   * another timer.
+   */
+  private handleHostResume = (): void => {
+    for (const s of [...this.sessions]) {
+      if (s.opened && !s.closed) this.endSession(s);
+    }
+  };
+
   /**
    * Rewarded video.
    *
-   * `onRewarded` is the ONLY signal that grants the bonus. onClose alone
-   * resolves as 'closed'. Both callbacks can fire, in either order, and the SDK
-   * may fire a callback twice — `settle` makes every path idempotent.
+   * `onRewarded` is the ONLY thing that grants the bonus, and the flag makes
+   * repeats harmless. `onClose` without it resolves as 'closed'.
    */
   showRewarded(hooks?: AdHooks): Promise<RewardedResult> {
-    if (this.adInFlight) return Promise.resolve({ status: 'unavailable' });
-    this.adInFlight = true;
-    return new Promise<RewardedResult>((resolve) => {
-      let rewarded = false;
-      let opened = false;
-      let done = false;
-      let timer: ReturnType<typeof setTimeout> | null = null;
+    const session = this.beginSession('rewarded', hooks);
+    if (!session) return Promise.resolve({ status: 'unavailable' });
 
+    return new Promise<RewardedResult>((resolve) => {
       const settle = (result: RewardedResult) => {
-        if (done) return;
-        done = true;
-        if (timer) clearTimeout(timer);
-        this.adInFlight = false;
+        if (session.settled) return;
+        session.settled = true;
         resolve(result);
       };
 
-      // Until the ad opens, treat silence as "no ad available" and bail early.
-      timer = setTimeout(() => settle({ status: 'unavailable' }), OPEN_TIMEOUT_MS);
+      // Silence before any open means no ad is coming. Settle so the button
+      // recovers — but do NOT end the session: a late open must still pause.
+      session.openTimer = setTimeout(() => {
+        session.openTimer = null;
+        if (!session.opened) settle({ status: 'unavailable' });
+      }, OPEN_TIMEOUT_MS);
 
       try {
         this.sdk.adv.showRewardedVideo({
           callbacks: {
-            onOpen: () => {
-              opened = true;
-              if (timer) clearTimeout(timer);
-              timer = setTimeout(
-                () => settle({ status: rewarded ? 'rewarded' : 'closed' }), AD_TIMEOUT_MS);
-              hooks?.onOpen?.();
+            onOpen: () => this.markOpen(session),
+            onRewarded: () => { session.rewarded = true; },
+            onClose: () => {
+              // Terminal for this session only; a stale session's callback
+              // cannot touch a newer one, because it holds its own object.
+              settle({ status: session.rewarded ? 'rewarded' : 'closed' });
+              this.endSession(session);
             },
-            onRewarded: () => { rewarded = true; },
-            // Close is the terminal event; the reward flag decides the outcome.
-            onClose: () => settle({ status: rewarded ? 'rewarded' : 'closed' }),
-            onError: (error) => settle(
-              opened && rewarded ? { status: 'rewarded' } : { status: 'error', error }),
+            onError: (error) => {
+              settle(session.rewarded ? { status: 'rewarded' } : { status: 'error', error });
+              this.endSession(session);
+            },
           },
         });
       } catch (error) {
         settle({ status: 'error', error });
+        this.endSession(session);
       }
     });
   }
 
   showInterstitial(hooks?: AdHooks): Promise<InterstitialResult> {
-    if (this.adInFlight) return Promise.resolve({ status: 'unavailable' });
-    this.adInFlight = true;
+    const session = this.beginSession('interstitial', hooks);
+    if (!session) return Promise.resolve({ status: 'unavailable' });
+
     return new Promise<InterstitialResult>((resolve) => {
-      let done = false;
-      let timer: ReturnType<typeof setTimeout> | null = null;
       const settle = (r: InterstitialResult) => {
-        if (done) return;
-        done = true;
-        if (timer) clearTimeout(timer);
-        this.adInFlight = false;
+        if (session.settled) return;
+        session.settled = true;
         resolve(r);
       };
-      timer = setTimeout(() => settle({ status: 'not_shown' }), OPEN_TIMEOUT_MS);
+
+      session.openTimer = setTimeout(() => {
+        session.openTimer = null;
+        if (!session.opened) settle({ status: 'not_shown' });
+      }, OPEN_TIMEOUT_MS);
 
       try {
         this.sdk.adv.showFullscreenAdv({
           callbacks: {
-            onOpen: () => {
-              if (timer) clearTimeout(timer);
-              timer = setTimeout(() => settle({ status: 'shown' }), AD_TIMEOUT_MS);
-              hooks?.onOpen?.();
+            onOpen: () => this.markOpen(session),
+            onClose: (wasShown) => {
+              settle({ status: wasShown || session.opened ? 'shown' : 'not_shown' });
+              this.endSession(session);
             },
-            onClose: (wasShown) => settle({ status: wasShown ? 'shown' : 'not_shown' }),
-            onError: (error) => settle({ status: 'error', error }),
-            // Offline is not an error the player should ever see.
-            onOffline: () => settle({ status: 'not_shown' }),
+            onError: (error) => {
+              settle({ status: 'error', error });
+              this.endSession(session);
+            },
+            // Offline is not an error the player should ever be shown.
+            onOffline: () => {
+              settle({ status: 'not_shown' });
+              this.endSession(session);
+            },
           },
         });
       } catch (error) {
         settle({ status: 'error', error });
+        this.endSession(session);
       }
     });
   }
@@ -296,10 +445,18 @@ export class YandexPlatform implements Platform {
     }
   }
 
+  /** Subscribe our own ad-recovery listener. Called once during create(). */
+  private watchHostResume(): void {
+    try {
+      this.offs.push(this.sdk.on('game_api_resume', this.handleHostResume));
+    } catch { /* host does not emit these */ }
+  }
+
   destroy(): void {
     for (const off of this.offs.splice(0)) {
       try { off(); } catch { /* ignore */ }
     }
+    for (const s of [...this.sessions]) this.endSession(s);
     this.gameplayStop();
   }
 }

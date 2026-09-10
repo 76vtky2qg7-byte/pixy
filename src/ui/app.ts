@@ -133,7 +133,32 @@ export class App {
     hideBoot();
     this.pause.clear('boot');
     this.show('menu');
+
+    // Screens are code-split, so each one is fetched the first time it opens.
+    // On a flaky connection that turns a button press into a dead screen, and
+    // it makes the game unplayable offline. Pulling every chunk in once the
+    // menu is up costs about 30 KB and removes the whole failure mode.
+    void this.preloadScreens();
   }
+
+  /** Warm every screen chunk. Failures are ignored; mounting retries anyway. */
+  private async preloadScreens(): Promise<void> {
+    await Promise.allSettled([
+      import('./screens/menu'),
+      import('./screens/contracts'),
+      import('./screens/prep'),
+      import('./screens/hud'),
+      import('./screens/results'),
+      import('./screens/workshop'),
+      import('./screens/settings'),
+      import('./screens/purchases'),
+      import('./screens/conflict'),
+    ]);
+    this.screensPreloaded = true;
+  }
+
+  /** True once every screen chunk is cached; surfaced for diagnostics. */
+  screensPreloaded = false;
 
   private async startPhaser(): Promise<void> {
     const parent = document.getElementById('game-canvas')!;
@@ -420,17 +445,16 @@ export class App {
     const since = (Date.now() - d.lastInterstitialAt) / 1000;
     if (since < ADS.interstitialCooldownSeconds) return;
 
-    try {
-      // The pause is taken when the ad opens, not when it is requested: an ad
-      // that never appears must not freeze the game while we wait on it.
-      const res = await this.platform.showInterstitial({ onOpen: () => this.pause.set('ad') });
-      if (res.status === 'shown') {
-        this.save.update((s) => { s.lastInterstitialAt = Date.now(); });
-      }
-    } finally {
-      // Clearing 'ad' does NOT resume a hidden tab or an open menu: those hold
-      // their own reasons.
-      this.pause.clear('ad');
+    // The pause is taken when the ad opens and released when it closes, so it
+    // matches how long the ad is actually on screen rather than how long this
+    // call happens to take. Clearing 'ad' does NOT resume a hidden tab or an
+    // open menu: those hold their own reasons.
+    const res = await this.platform.showInterstitial({
+      onOpen: () => this.pause.set('ad'),
+      onClose: () => this.pause.clear('ad'),
+    });
+    if (res.status === 'shown') {
+      this.save.update((s) => { s.lastInterstitialAt = Date.now(); });
     }
   }
 
@@ -455,14 +479,47 @@ export class App {
     if (name !== 'game') audio.setMood(name === 'menu' || name === 'contracts' ? 'menu' : 'none');
 
     const ctx: AppContext = { app: this, save: this.save, platform: this.platform, ui: this.uiRoot };
-    void mountScreen(name, ctx).then((teardownFn) => {
-      if (token !== this.mountToken) {
-        // A newer show() already won; drop this screen's DOM and listeners.
-        teardownFn();
-        return;
-      }
-      this.teardown = teardownFn;
-    });
+    void mountScreen(name, ctx).then(
+      (teardownFn) => {
+        if (token !== this.mountToken) {
+          // A newer show() already won; drop this screen's DOM and listeners.
+          teardownFn();
+          return;
+        }
+        this.teardown = teardownFn;
+      },
+      (error) => {
+        // The screen's chunk could not be fetched. Never leave the player on a
+        // blank screen with nothing to press.
+        if (token !== this.mountToken) return;
+        console.error('[sparkscrapper] screen failed to load', name, error);
+        this.showScreenLoadFailure(name);
+      },
+    );
+  }
+
+  /** Recovery UI for a screen whose code could not be fetched. */
+  private showScreenLoadFailure(name: ScreenName): void {
+    clear(this.uiRoot);
+    const wrap = document.createElement('div');
+    wrap.className = 'screen';
+    wrap.style.cssText = 'justify-content:center;align-items:center;text-align:center;gap:14px';
+    const msg = document.createElement('p');
+    msg.className = 'muted';
+    msg.style.cssText = 'max-width:min(420px,88vw);line-height:1.45';
+    msg.textContent = t('screenLoadFailed');
+    const retry = document.createElement('button');
+    retry.className = 'btn primary';
+    retry.type = 'button';
+    retry.textContent = t('retry');
+    retry.addEventListener('click', () => this.show(name));
+    const home = document.createElement('button');
+    home.className = 'btn ghost';
+    home.type = 'button';
+    home.textContent = t('toMenu');
+    home.addEventListener('click', () => this.show('menu'));
+    wrap.append(msg, retry, home);
+    this.uiRoot.append(wrap);
   }
 
   /** Screens register a per-frame updater (the HUD is the only user). */

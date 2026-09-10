@@ -16,7 +16,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
 const ZIP = path.join(ROOT, 'yandex-build.zip');
 
-/** Internal budget, not a platform limit — see README. */
+/**
+ * Platform limit for the unpacked archive, as relayed by review from the
+ * Yandex Games requirements page. That page is not reachable from this build
+ * environment, so it could not be re-read first-hand — see TEST_REPORT.md.
+ */
+const PLATFORM_LIMIT_MB = 100;
+/** Our own, much tighter target: a phone on mobile data has to load this. */
 const SIZE_BUDGET_MB = 20;
 
 const FORBIDDEN = [
@@ -27,8 +33,22 @@ const FORBIDDEN = [
   /(^|\/)tools(\/|$)/,
 ];
 
-/** Yandex unpacks the archive on a case-insensitive store; keep names plain. */
+/**
+ * File and folder names must contain no spaces and no Cyrillic. Restricting to
+ * plain ASCII letters, digits, dot, dash and underscore satisfies that and
+ * leaves no room for anything else surprising.
+ */
 const SAFE_NAME = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * The single absolute URL the build is allowed to contain.
+ *
+ * `/sdk.js` is the platform's own endpoint for a ZIP served by Yandex, not a
+ * game asset — the relative-path rule exists so OUR files resolve under the
+ * game's directory, and this one deliberately must not. `./sdk.js` would point
+ * inside the game folder, where nothing is served.
+ */
+const PLATFORM_SDK_PATH = '/sdk.js';
 
 const fail = (msg) => { console.error(`\n  FAILED: ${msg}\n`); process.exit(1); };
 
@@ -58,7 +78,9 @@ for (const f of files) {
     if (rule.test(f.rel)) fail(`${f.rel} matches a forbidden pattern (${rule}).`);
   }
   for (const part of f.rel.split('/')) {
-    if (!SAFE_NAME.test(part)) fail(`unsafe file name: ${f.rel}`);
+    if (!SAFE_NAME.test(part)) {
+      fail(`unsafe file or folder name (no spaces or non-ASCII allowed): ${f.rel}`);
+    }
   }
 }
 
@@ -91,10 +113,26 @@ for (const f of jsFiles) {
   }
 }
 
+/* ---- 3b. the SDK is loaded from the platform root, not bundled or relative ---- */
+const bundleText = jsFiles.map((f) => fs.readFileSync(f.abs, 'utf8')).join('\n');
+if (!bundleText.includes(`"${PLATFORM_SDK_PATH}"`) && !bundleText.includes(`'${PLATFORM_SDK_PATH}'`)) {
+  fail(`the build does not reference the platform SDK at ${PLATFORM_SDK_PATH}.`);
+}
+if (files.some((f) => f.rel === 'sdk.js')) {
+  fail('sdk.js must not be bundled — the platform serves it.');
+}
+if (bundleText.includes('yandex.ru/games/sdk')) {
+  fail('the build still references a legacy SDK endpoint.');
+}
+
 /* ---- 4. size ---- */
 const total = files.reduce((n, f) => n + f.size, 0);
-if (total > SIZE_BUDGET_MB * 1024 * 1024) {
-  fail(`dist/ is ${(total / 1048576).toFixed(1)} MB, over the ${SIZE_BUDGET_MB} MB budget.`);
+const totalMB = total / 1048576;
+if (totalMB > PLATFORM_LIMIT_MB) {
+  fail(`dist/ is ${totalMB.toFixed(1)} MB unpacked, over the ${PLATFORM_LIMIT_MB} MB platform limit.`);
+}
+if (totalMB > SIZE_BUDGET_MB) {
+  fail(`dist/ is ${totalMB.toFixed(1)} MB unpacked, over our own ${SIZE_BUDGET_MB} MB target.`);
 }
 
 /* ---- 5. write the archive ---- */
@@ -120,7 +158,9 @@ console.log('  index.html at root .......... ok');
 console.log('  relative paths only ......... ok');
 console.log('  no sources / secrets ........ ok');
 console.log('  no runtime CDN for libraries. ok');
-console.log(`  size budget ................. ok (${(total / 1048576).toFixed(2)} / ${SIZE_BUDGET_MB} MB)`);
+console.log(`  SDK from ${PLATFORM_SDK_PATH} ............ ok`);
+console.log(`  no spaces / non-ASCII names . ok`);
+console.log(`  unpacked size ............... ok (${totalMB.toFixed(2)} MB; target ${SIZE_BUDGET_MB} MB, platform limit ${PLATFORM_LIMIT_MB} MB)`);
 for (const f of [...files].sort((a, b) => b.size - a.size).slice(0, 8)) {
   console.log(`    ${(f.size / 1024).toFixed(0).padStart(6)} KB  ${f.rel}`);
 }

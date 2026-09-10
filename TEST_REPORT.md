@@ -1,8 +1,17 @@
 # Test report
 
+> **On sources.** `yandex.ru` and `yandex.com` are blocked by this environment's
+> network policy, so the official requirements and SDK pages could **not** be
+> read here — not at any point, including for this revision. Every statement
+> below about platform rules is either (a) taken from the published
+> `@types/ysdk` type definitions, which are installable from npm and are in the
+> lockfile, or (b) **relayed by external review** of those pages. Relayed facts
+> are marked as such and were not independently verified.
+
 Three layers of checking, in order of how much they prove:
 
-1. **104 unit tests** (`npm test`) — adjacency, economy, saves, pause manager.
+1. **129 unit tests** (`npm test`) — adjacency, economy, saves, pause manager,
+   and the ad lifecycle.
 2. **62 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
    build**, driven in Chromium, with a fake Yandex SDK injected before boot so
    the **real** shipped adapter is what runs.
@@ -15,13 +24,14 @@ in the last section, unrun.
 
 ---
 
-## 1. Unit tests — 104 passed
+## 1. Unit tests — 129 passed
 
 ```
 src/tests/grid.test.ts      24 passed
 src/tests/economy.test.ts   29 passed
 src/tests/pause.test.ts     21 passed
 src/tests/save.test.ts      30 passed
+src/tests/ads.test.ts       25 passed
 ```
 
 **Adjacency (24)** — orthogonal neighbours only; all four diagonal pairs on a
@@ -43,6 +53,38 @@ resume a hidden tab or a closed menu; idempotent set; announcements fire only on
 an actual transition; every ordering of set/clear; the clock clamps a 60-second
 delta instead of fast-forwarding the fight; `Subscriptions.disposeAll` releases
 everything including DOM listeners.
+
+**Ad lifecycle (25)** — these drive the **real adapter** against a **scripted
+SDK** whose callbacks the test fires by hand. They prove the adapter's own state
+machine. They are **not** a test of live advertising: fill rate, real close
+behaviour and ad-blocker interaction can only be checked in a Yandex draft.
+
+The property they exist to protect: **the pause tracks whether an ad is on
+screen, never how long the call took.**
+
+| Scenario | Asserted |
+|---|---|
+| Ad open longer than any watchdog (120s) | still paused, still `adVisible` |
+| No `onOpen` inside the open window | promise settles, **nothing is paused** |
+| `onOpen` arrives *after* that timeout | pauses anyway, and later resumes |
+| `onClose` lost, host emits `game_api_resume` | pause recovers from a real signal |
+| `onClose` and resume both lost | released after a long backstop, counted as abandoned |
+| Second request while an ad is on screen | refused; only one `showRewardedVideo` call |
+| Second request inside the first open window | refused |
+| Retry after a timeout | allowed — a silent host must not disable the button |
+| Three silent requests, then a real one | the fourth works normally |
+| Stale request's `onRewarded` during a new one | the new request still resolves `closed` |
+| Stale `onClose` while a fresh ad is up | pause held |
+| Stale request opens late alongside a fresh ad | pause held until **both** close |
+| `onRewarded` x3, `onClose` x2, late `onError` | resolves once, `rewarded` |
+| Duplicated `onOpen` | pauses once, closes once |
+| `onClose` with no reward | no grant |
+| Host throws synchronously | error, nothing paused, no stuck button |
+| Ad closes while the tab is hidden | `hidden` pause survives |
+| Ad closes while a menu is open | `menu` pause survives |
+| Interstitial `onOffline` | reported as `not_shown`, not an error |
+| Interstitial while a rewarded video is up | refused |
+| SDK endpoint | `/sdk.js`, not `./sdk.js`, not the legacy URL |
 
 **Saves (30)** — junk input of every shape yields a clean default; unknown gear,
 contracts, robots and upgrade ids are dropped; levels clamp to their caps;
@@ -149,6 +191,28 @@ closed and disabled afterwards.
 | Ends on the results screen | pass |
 | **No console errors or unhandled rejections for the whole contract** | pass |
 
+### Offline play
+The store card claims the game keeps working with no network, so that claim is
+tested. The connection is dropped right after boot, with only the menu visited.
+
+| Check | Result |
+|---|---|
+| Every screen still opens offline (contracts, prep, wave, results, workshop, settings) | pass |
+| No request fails while playing offline | pass |
+| Progress is still written locally | pass |
+| No console errors offline | pass |
+
+**This claim was false when first written and is now true.** The original build
+failed on the very first tap: screens are code-split, so opening the contract
+list fetched a chunk that could not be loaded, producing an unhandled rejection
+and a dead screen. Two changes fixed it — every screen chunk is now warmed
+immediately after boot (~30 KB), and the small sprite sheets are inlined so the
+CSS-referenced icon sheet is never a separate request. A screen that still fails
+to load now shows a retry instead of nothing.
+
+Scope of the claim: **once the page has loaded.** Reloading the page needs the
+network, as does anything platform-side — ads, cloud saves, purchases.
+
 The only network failure observed anywhere is `ERR_TUNNEL_CONNECTION_FAILED` for
 `https://yandex.ru/games/sdk/v2`, because this environment blocks `yandex.ru`.
 That is the intended degradation path and the game runs fully without the SDK —
@@ -166,12 +230,28 @@ gets a working game.**
 | No sources, source maps, `.env`, keys or `node_modules` | pass |
 | File names plain ASCII | pass |
 | No library fetched from a CDN at runtime | pass |
-| Size within budget | pass — 1.35 MB unpacked, **425 KB zipped** |
+| No spaces or non-ASCII in any file or folder name | pass |
+| SDK referenced at the platform root `/sdk.js`, not bundled, no legacy URL | pass |
+| Size within limits | pass — **1.36 MB unpacked, 428 KB zipped** |
 | Every `dist/` file present in the archive | pass |
-| **Game unpacked from the ZIP and played from a nested path** (`/games/12345/`) | pass — menu, contract, wave, wave cleared, Cyrillic font loaded, zero console errors |
+| **Game unpacked from the ZIP and played from a nested path** (`/games/12345/`) | pass — menu, contract, wave, wave cleared, Cyrillic font loaded |
+| **The SDK request resolves to the site ROOT, not the game's subdirectory** | pass — served from `/games/12345/`, the browser requested `http://host/sdk.js` |
+| Game stays fully playable when that request 404s | pass — falls back to the null platform, wave runs, HP 110 |
 
-Serving from a nested path is what actually proves `base: './'` works; serving
-from a domain root would have hidden an absolute-path bug.
+Serving from a nested path is what actually proves two separate things at once,
+and serving from a domain root would have hidden both:
+
+1. `base: './'` works — every game asset resolves under `/games/12345/`.
+2. `/sdk.js` is genuinely absolute — the browser asked for `http://host/sdk.js`,
+   at the root, exactly where the platform serves it. Had it been `./sdk.js` the
+   request would have gone to `/games/12345/sdk.js`, which does not exist on
+   Yandex either. This is the closest available proof that the corrected
+   endpoint is right; the endpoint itself still cannot be reached from here.
+
+The local server has no `/sdk.js`, so the request 404s and the game falls back
+to the null platform and remains fully playable. That is the intended
+degradation, and it doubles as the "a player whose network blocks the SDK still
+gets a working game" case.
 
 ### Reproducible from a clean clone
 
@@ -181,6 +261,24 @@ tests pass and the packer produces a byte-identical 426 KB archive, so nothing
 in the result depends on state left behind in the development directory.
 
 ---
+
+### Archive requirements
+
+Relayed by external review from the Yandex Games requirements page (**not read
+from this environment** — see the note at the top):
+
+| Requirement | Status |
+|---|---|
+| No more than 100 MB unpacked | 1.36 MB — checked by the packer |
+| `index.html` at the root of the ZIP | checked by the packer |
+| No spaces or Cyrillic in file and folder names | checked by the packer (plain ASCII only) |
+| Progress is saved | implemented and tested |
+| A finished game, not a demo | release content is complete |
+| Monetised by ads or purchases | rewarded video + interstitial; purchases optional |
+| Field and media limits live in the draft form | **not verified** — see `store/MEDIA.md` |
+
+The packer enforces both the 100 MB platform limit and our own 20 MB target,
+and fails rather than writing an archive that breaks either.
 
 ## 4. Screens inspected visually
 
@@ -237,6 +335,41 @@ Ordered by how they were caught.
    now taken when the ad *opens*, not when it is *requested*, and a 6-second
    watchdog gives up if it never opens.
 
+### Found by external code review, then fixed and tested here
+
+15. **The SDK was loaded from the wrong URL.** The adapter used
+    `https://yandex.ru/games/sdk/v2`. A build served by Yandex from a ZIP
+    exposes the SDK at the root path **`/sdk.js`**. This would have failed at
+    the first hurdle in a real draft, and no amount of local testing would have
+    caught it, because the endpoint is unreachable from here either way. Now
+    `/sdk.js`, with the self-hosted form exported alongside it, and the packer
+    asserts the built bundle actually references it.
+
+16. **The pause could be released while an ad was still on screen.** A 45-second
+    watchdog resolved the promise, and the caller cleared the `ad` pause in a
+    `finally`. Any rewarded video longer than 45 seconds would have resumed the
+    game — sound, simulation and all — underneath the ad.
+
+17. **A late `onOpen` could freeze the game permanently.** After the 6-second
+    open timeout the promise resolved and the caller cleared the `ad` pause. If
+    the host then opened the ad, `onOpen` set the pause again with nothing left
+    to clear it. The game would sit paused forever.
+
+18. **A finished request released the in-flight guard while its ad was still
+    up**, so a second tap could stack a second ad; and a stale request's late
+    callbacks could resolve a newer request.
+
+    All three are the same root cause: the ad's *visibility* and the promise's
+    *lifetime* were treated as one thing. They are now separate. Each request
+    is a session; the pause is driven by `onOpen`/`onClose` hooks and counts how
+    many ads are open, so it releases only when the last one closes. The promise
+    settles independently so the button never sticks. `game_api_resume` is used
+    as a real recovery signal when `onClose` is lost, with a long backstop only
+    for a host that provides neither.
+
+19. **The game did not work offline, while the store card said it did.** See the
+    offline section above.
+
 ### Found by the balance harness
 
 9. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
@@ -269,9 +402,10 @@ and live inventory, and I will not claim otherwise.
 
 | Area | What still needs checking on the platform |
 |---|---|
-| **SDK loading** | `https://yandex.ru/games/sdk/v2` is blocked from this environment. The adapter was exercised against a scripted SDK matching the published `@types/ysdk` surface, never against the real script. |
-| **Documentation** | `yandex.ru` and `yandex.com` are both blocked here. Re-read the requirements page, the SDK pages, and confirm the **current archive size limit** and **required store image dimensions** before uploading. |
-| **Real ads** | No live ad inventory was involved. Fill rate, real close behaviour, and how the SDK behaves with an ad blocker are all unverified. |
+| **SDK loading** | The adapter now points at `/sdk.js`, which is correct for a ZIP served by Yandex — but that endpoint only exists on the platform, so **it has never actually been fetched**. The adapter was exercised against a scripted SDK matching the published `@types/ysdk` surface. This is the single highest-value thing to check first in a draft. |
+| **Documentation** | `yandex.ru` and `yandex.com` are blocked here and were never readable. Everything stated about platform rules is relayed by review. Re-read the requirements and SDK pages, and confirm the **archive size limit** and **required store image dimensions** in the draft form. |
+| **Real ads** | No live ad inventory was involved. Fill rate, real close behaviour, real callback ordering and ad-blocker interaction are all unverified. The 25 ad tests use a **scripted** SDK, not a real one. |
+| **Long real ads** | The "pause holds for the whole ad" property is proven against a scripted 120-second ad. Confirm it with a real rewarded video, which is exactly what step 5 of `store/OWNER_CHECKLIST.md` is for. |
 | **Interstitial pacing** | The rule (results screen only, never the first session, every 2nd contract, 180s cooldown) is implemented and configurable in `src/config/balance.ts`, but must be checked against the platform's current policy. |
 | **Purchases** | No catalogue exists, so `getCatalog()` returns empty and the UI hides itself. **Payments are not verified.** Products, prices, entitlement grants and restore-across-devices all need a configured catalogue. |
 | **Cloud saves** | Verified against a scripted `player.setData`/`getData`. Real rate limits, the guest-mode slot, and cross-device behaviour are unverified. |
@@ -291,8 +425,28 @@ Eight events are implemented and stamped with a per-run random attempt id and
 locally; `Analytics.attach(sink)` is the single hook where a real backend would
 be wired in. **Nothing is transmitted anywhere by this build.**
 
+## Purchases
+
+Two non-consumable entitlements are implemented (`foreman_kit`,
+`no_forced_ads`). With no catalogue configured, `getCatalog()` returns empty and
+the purchase section renders nothing at all — no buttons, no placeholder prices,
+no "coming soon". That is the intended shipping state: **the first release is
+monetised by advertising only.** There is no soft currency and no consumable
+item. Real payments and cross-device restore are **unverified** and can only be
+checked with a configured catalogue in a draft.
+
 ## Video
 
-**No gameplay video was recorded.** Video capture was not available in this
-environment. The still screenshots in `store/screenshots/` are real captures of
-the built game, not mock-ups; a video will need to be recorded separately.
+**No gameplay video was recorded**, and none was faked from stills. Screen
+capture is not available in this environment. The screenshots in
+`store/screenshots/` are real frames of the built game.
+
+`store/VIDEO_SCRIPT.md` is a shot-by-shot 30-second script so the owner can
+record it in one take, and `store/MEDIA.md` lists every image with its measured
+dimensions and file size.
+
+## Where to start
+
+`store/OWNER_CHECKLIST.md` is the ordered list of everything that needs a real
+draft, beginning with SDK initialisation — the one thing that cannot be checked
+from here at all.

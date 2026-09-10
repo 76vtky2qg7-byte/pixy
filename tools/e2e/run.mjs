@@ -520,7 +520,57 @@ for (const [mode, expectDouble, label] of [
 }
 
 /* ================================================================== */
-/* 11. Screenshots at the three required sizes                         */
+/* 11. Offline play — the store card claims it, so it must be true     */
+/* ================================================================== */
+{
+  const { ctx, page, errors } = await openGame(browser, { device: 'phone' });
+  await page.evaluate(() => window.__app.save.update((d) => { d.progress.tutorialDone = true; }));
+  await page.waitForFunction(() => window.__app.screensPreloaded === true, null, { timeout: 15000 })
+    .catch(() => {});
+
+  const failedRequests = [];
+  page.on('requestfailed', (r) => failedRequests.push(r.url()));
+  await ctx.setOffline(true);
+
+  // Every screen, with the connection already gone.
+  await tap(page, 'Играть');
+  const contractsOk = await has(page, 'Ночная смена');
+  await page.locator('#ui-root .card', { hasText: 'Ночная смена' }).first().click();
+  await tap(page, 'Принять контракт');
+  const prepOk = await has(page, 'Склад');
+  await dismissCoach(page);
+  await tap(page, 'Начать волну');
+  await playFor(page, 2.5);
+  const waveOk = (await readState(page)).screen === 'game';
+  await forceWave(page, 'failed');
+  const resultsOk = await has(page, 'Смена прервана');
+  await tap(page, 'В меню');
+  await tap(page, 'Мастерская');
+  const workshopOk = await has(page, 'Мастерская');
+  await tap(page, '‹');
+  await tap(page, 'Настройки');
+  const settingsOk = await has(page, 'Язык');
+
+  report.add('offline: every screen still opens',
+    contractsOk && prepOk && waveOk && resultsOk && workshopOk && settingsOk,
+    `contracts=${contractsOk} prep=${prepOk} wave=${waveOk} results=${resultsOk} workshop=${workshopOk} settings=${settingsOk}`);
+  report.add('offline: no request fails while playing', failedRequests.length === 0,
+    failedRequests.slice(0, 3).join(', '));
+
+  // Progress must still be written locally with no network.
+  const savedOffline = await readSave(page);
+  report.add('offline: progress is still saved locally', !!savedOffline && savedOffline.revision > 0,
+    `revision=${savedOffline?.revision}`);
+
+  const offlineErrors = note(errors, 'offline');
+  report.add('offline: no console errors', offlineErrors.length === 0, offlineErrors.join(' | '));
+
+  await ctx.setOffline(false);
+  await ctx.close();
+}
+
+/* ================================================================== */
+/* 12. Screenshots at the three required sizes                         */
 /* ================================================================== */
 for (const [device, name] of [['phoneSmall', '360x800'], ['phone', '390x844'], ['laptop', '1366x768']]) {
   const { ctx, page } = await openGame(browser, { device });

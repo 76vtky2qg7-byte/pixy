@@ -9,6 +9,7 @@ export const RU = {
   gameTitle: 'ИСКРОЛОМ',
   gameSubtitle: 'ночная смена на перерабатывающем заводе',
   loading: 'Загрузка…',
+  screenLoadFailed: 'Не удалось загрузить экран. Проверьте соединение и попробуйте снова.',
   tapToStart: 'Нажмите, чтобы начать',
 
   // --- main menu ---
@@ -267,6 +268,7 @@ export const EN: Record<StringKey, string> = {
   gameTitle: 'SPARKSCRAPPER',
   gameSubtitle: 'night shift at the reclamation plant',
   loading: 'Loading…',
+  screenLoadFailed: 'This screen could not be loaded. Check your connection and try again.',
   tapToStart: 'Tap to start',
 
   play: 'Play',

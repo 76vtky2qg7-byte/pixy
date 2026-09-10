@@ -24,7 +24,7 @@ npm run dev          # regenerate art, then start the dev server on :5173
 npm run build        # regenerate art, typecheck, and build to dist/
 npm run preview      # serve the production build on :4173
 
-npm test             # unit tests (104)
+npm test             # unit tests (129)
 npm run art          # regenerate every sprite from source code
 npm run release      # build + verify + write yandex-build.zip
 ```
@@ -41,9 +41,10 @@ mkdir -p /tmp/pw && cd /tmp/pw && npm i playwright@1.63.0
 cd -  && ln -sfn /tmp/pw/node_modules/playwright node_modules/playwright \
                  && ln -sfn /tmp/pw/node_modules/playwright-core node_modules/playwright-core
 
-node tools/e2e/run.mjs        # 62 end-to-end checks against the built game
+node tools/e2e/run.mjs        # 66 end-to-end checks against the built game
 node tools/e2e/perf.mjs       # frame-rate measurement
 node tools/store-art.mjs      # regenerate the store cover images
+node tools/media-manifest.mjs # re-measure store/MEDIA.md from the image files
 npx vite-node tools/sim/report.ts   # regenerate the tables in BALANCE.md
 ```
 
@@ -61,6 +62,8 @@ manages its own browsers.
 2. In the Yandex Games developer console, create a draft and upload
    `yandex-build.zip`.
 3. Fill the store card from `store/card-ru.md` and `store/card-en.md`.
+   Work through `store/OWNER_CHECKLIST.md` — it is the ordered list of
+   everything that needs a real draft, starting with SDK initialisation.
 4. Upload `store/icon-512x512.png` and `store/cover-800x470.png`, plus the
    screenshots in `store/screenshots/`.
    **Check the current required image sizes in the console before uploading** —
@@ -113,10 +116,20 @@ combat maths directly.
 - **The official Yandex documentation could not be read from this environment**
   (`yandex.ru` and `yandex.com` are blocked by the network egress policy). The
   SDK integration is written against the published `@types/ysdk` type
-  definitions, which describe the current SDK surface. Before publishing,
-  re-check the requirements page, the current archive size limit, and the
-  required store image sizes.
-- The 20 MB figure used by the packer is an **internal budget**, not a platform
-  limit. The build is currently about **1.4 MB unpacked / 425 KB zipped**.
+  definitions, which describe the current SDK surface; platform rules quoted in
+  the docs here are **relayed by external review**, not read first-hand. Before
+  publishing, re-check the requirements page and confirm the archive size limit
+  and required store image sizes in the draft form.
+- The SDK is loaded from **`/sdk.js`** — the platform's root endpoint for a ZIP
+  served by Yandex. This is the one absolute path in the build, and it is
+  deliberate; `./sdk.js` would resolve inside the game's own directory. That
+  endpoint only exists on the platform, so **it has never been fetched from
+  here**: verifying SDK init in a draft is the first thing to do.
+- The packer enforces a **100 MB** unpacked platform limit (relayed) and our own
+  tighter **20 MB** target. The build is currently **1.36 MB unpacked /
+  428 KB zipped**.
+- **Gameplay works with no network once the page has loaded** — verified, see
+  `TEST_REPORT.md`. Reloading needs the network, as do ads, cloud saves and
+  purchases.
 - The name "Искролом" / "Sparkscrapper" has **not** been checked against the
   Yandex Games catalogue for collisions. Treat it as provisional.

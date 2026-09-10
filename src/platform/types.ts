@@ -20,8 +20,18 @@ export interface PurchaseProduct {
   imageURI: string;
 }
 
+/**
+ * Lifecycle hooks for one ad request.
+ *
+ * These — not the returned promise — own the pause. `onOpen` fires when the ad
+ * is actually on screen and `onClose` fires exactly once for each `onOpen`,
+ * even if that happens long after the promise has already resolved. Tying the
+ * pause to the promise instead would unpause the game underneath a still
+ * visible ad, or leave it paused forever after a late open.
+ */
 export interface AdHooks {
   onOpen?: () => void;
+  onClose?: () => void;
 }
 
 export interface PlatformInfo {
@@ -47,12 +57,14 @@ export interface Platform {
   gameplayStop(): void;
 
   /**
-   * `hooks.onOpen` fires only when the ad actually appears on screen. The game
-   * uses it to decide when to pause: an ad that never opens must not freeze
-   * anything, so the pause is taken on open rather than on request.
+   * The promise reports the OUTCOME the UI should act on; `hooks` report the
+   * ad's VISIBILITY. They are deliberately separate, because the promise has to
+   * settle so the button un-sticks, while the ad may still be on screen.
    */
   showRewarded(hooks?: AdHooks): Promise<RewardedResult>;
   showInterstitial(hooks?: AdHooks): Promise<InterstitialResult>;
+  /** True while an ad is actually displayed. Used by tests and diagnostics. */
+  readonly adVisible: boolean;
 
   loadCloud(): Promise<unknown>;
   saveCloud(data: unknown): Promise<void>;

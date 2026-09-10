@@ -70,8 +70,14 @@ export function mountResults(ctx: AppContext): () => void {
     analytics.track({ name: 'rewarded_offer', placement: 'results' });
     let outcome = 'unavailable';
     try {
-      // Pause on open, not on request — see App.maybeShowInterstitial.
-      const res = await app.platform.showRewarded({ onOpen: () => app.pause.set('ad') });
+      // The pause is bound to the ad being VISIBLE, not to this await. An ad
+      // can open after the promise resolves, and can stay up long after it —
+      // clearing the pause here in a `finally` would unpause the game
+      // underneath a still-visible ad.
+      const res = await app.platform.showRewarded({
+        onOpen: () => app.pause.set('ad'),
+        onClose: () => app.pause.clear('ad'),
+      });
       outcome = res.status;
 
       if (res.status === 'rewarded') {
@@ -97,7 +103,6 @@ export function mountResults(ctx: AppContext): () => void {
       toast(t('adNotAvailable'));
       adBtn.textContent = t('adNotAvailable');
     } finally {
-      app.pause.clear('ad');
       claiming = false;
       analytics.track({ name: 'rewarded_complete', placement: 'results', result: outcome });
     }
