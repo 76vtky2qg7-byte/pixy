@@ -1,6 +1,9 @@
 node_modules/
 dist/
-yandex-build.zip
 *.local
 .DS_Store
 /artifacts/
+
+# yandex-build.zip is committed on purpose: it is the deliverable a reviewer
+# uploads, and it should be obtainable without running a build. Regenerate it
+# with `npm run release`.
