@@ -1,0 +1,107 @@
+{
+  "actors": {
+    "w": 256,
+    "h": 96,
+    "frameW": 32,
+    "frameH": 32,
+    "frames": 24
+  },
+  "bosses": {
+    "w": 320,
+    "h": 128,
+    "frameW": 64,
+    "frameH": 64,
+    "frames": 10
+  },
+  "pickups": {
+    "w": 96,
+    "h": 16,
+    "frameW": 16,
+    "frameH": 16,
+    "frames": 6
+  },
+  "proj": {
+    "w": 120,
+    "h": 40,
+    "frameW": 20,
+    "frameH": 20,
+    "frames": 12
+  },
+  "fx_hit": {
+    "w": 64,
+    "h": 16,
+    "frameW": 16,
+    "frameH": 16,
+    "frames": 4
+  },
+  "fx_pop": {
+    "w": 64,
+    "h": 16,
+    "frameW": 16,
+    "frameH": 16,
+    "frames": 4
+  },
+  "fx_boom": {
+    "w": 240,
+    "h": 40,
+    "frameW": 40,
+    "frameH": 40,
+    "frames": 6
+  },
+  "fx_upgrade": {
+    "w": 240,
+    "h": 48,
+    "frameW": 48,
+    "frameH": 48,
+    "frames": 5
+  },
+  "fx_warn": {
+    "w": 256,
+    "h": 64,
+    "frameW": 64,
+    "frameH": 64,
+    "frames": 4
+  },
+  "tiles": {
+    "w": 128,
+    "h": 96,
+    "frameW": 32,
+    "frameH": 32,
+    "frames": 12
+  },
+  "props": {
+    "w": 160,
+    "h": 28,
+    "frameW": 40,
+    "frameH": 28,
+    "frames": 4
+  },
+  "icons": {
+    "w": 140,
+    "h": 40,
+    "frameW": 20,
+    "frameH": 20,
+    "frames": 14
+  },
+  "glyphs": {
+    "w": 42,
+    "h": 14,
+    "frameW": 14,
+    "frameH": 14,
+    "frames": 3
+  },
+  "digits": {
+    "w": 98,
+    "h": 9,
+    "frameW": 7,
+    "frameH": 9,
+    "frames": 14
+  },
+  "store_icon": {
+    "w": 512,
+    "h": 512,
+    "frameW": 512,
+    "frameH": 512,
+    "frames": 1
+  }
+}

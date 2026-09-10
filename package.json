@@ -1,0 +1,27 @@
+{
+  "name": "sparkscrapper",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sparkscrapper / Iskrolom - pixel arena survivor for Yandex Games",
+  "type": "module",
+  "scripts": {
+    "art": "node tools/genart.mjs",
+    "dev": "npm run art && vite",
+    "build": "npm run art && tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pack:yandex": "node tools/pack.mjs",
+    "release": "npm run build && npm run pack:yandex",
+    "verify": "node tools/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/ysdk": "1.2.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "5.0.0"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  }
+}
