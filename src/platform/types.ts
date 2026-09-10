@@ -20,6 +20,10 @@ export interface PurchaseProduct {
   imageURI: string;
 }
 
+export interface AdHooks {
+  onOpen?: () => void;
+}
+
 export interface PlatformInfo {
   name: 'yandex' | 'mock' | 'none';
   lang: 'ru' | 'en';
@@ -42,8 +46,13 @@ export interface Platform {
   gameplayStart(): void;
   gameplayStop(): void;
 
-  showRewarded(): Promise<RewardedResult>;
-  showInterstitial(): Promise<InterstitialResult>;
+  /**
+   * `hooks.onOpen` fires only when the ad actually appears on screen. The game
+   * uses it to decide when to pause: an ad that never opens must not freeze
+   * anything, so the pause is taken on open rather than on request.
+   */
+  showRewarded(hooks?: AdHooks): Promise<RewardedResult>;
+  showInterstitial(hooks?: AdHooks): Promise<InterstitialResult>;
 
   loadCloud(): Promise<unknown>;
   saveCloud(data: unknown): Promise<void>;

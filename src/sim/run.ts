@@ -258,17 +258,25 @@ export interface ContractResult {
  */
 export function contractResult(run: RunState, won: boolean): ContractResult {
   const perWave = Math.round(CREDITS.perWaveCleared * run.wavesCleared);
+  // Machines scrapped pay too, so an attempt that died partway through wave one
+  // still returns something. Without this a first-ever failure pays literally
+  // zero, which reads as "that was a waste of four minutes".
+  const perKill = Math.floor(run.totalKills / CREDITS.killsPerCredit);
   const winBonus = won ? CREDITS.contractWinBonus : 0;
   const tier = runContract(run).tier;
   const tierBonus = Math.round((perWave + winBonus) * 0.25 * tier);
-  const raw = perWave + winBonus + tierBonus;
-  const base = won ? raw : Math.round(raw * CREDITS.lossMultiplier);
+  const raw = perWave + perKill + winBonus + tierBonus;
+  const base = Math.max(
+    won ? raw : CREDITS.minimumPayout,
+    won ? raw : Math.round(raw * CREDITS.lossMultiplier),
+  );
 
   const breakdown = [
     { key: 'waves', amount: perWave },
+    ...(perKill ? [{ key: 'kills', amount: perKill }] : []),
     ...(won ? [{ key: 'win', amount: winBonus }] : []),
     ...(tierBonus ? [{ key: 'tier', amount: tierBonus }] : []),
-    ...(won ? [] : [{ key: 'retreat', amount: base - perWave - tierBonus }]),
+    ...(won ? [] : [{ key: 'retreat', amount: base - perWave - perKill - tierBonus }]),
   ];
 
   return {

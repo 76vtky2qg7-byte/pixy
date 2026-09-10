@@ -1,5 +1,5 @@
 import type {
-  InterstitialResult, Platform, PlatformInfo, PurchaseProduct, RewardedResult,
+  AdHooks, InterstitialResult, Platform, PlatformInfo, PurchaseProduct, RewardedResult,
 } from './types';
 
 /**
@@ -44,9 +44,11 @@ export class MockPlatform implements Platform {
   gameplayStart(): void { /* no host to notify */ }
   gameplayStop(): void { /* no host to notify */ }
 
-  async showRewarded(): Promise<RewardedResult> {
+  async showRewarded(hooks?: AdHooks): Promise<RewardedResult> {
     if (this.adInFlight) return { status: 'unavailable' };
+    if (this.adMode === 'unavailable') return { status: 'unavailable' };
     this.adInFlight = true;
+    hooks?.onOpen?.();
     // Ads take over the screen, so the mock announces a host pause the same way.
     for (const cb of this.pauseCbs) cb();
     await new Promise((r) => setTimeout(r, this.delay));
@@ -56,7 +58,6 @@ export class MockPlatform implements Platform {
     switch (this.adMode) {
       case 'closed': return { status: 'closed' };
       case 'error': return { status: 'error', error: new Error('mock ad error') };
-      case 'unavailable': return { status: 'unavailable' };
       case 'double':
         // Two grants from one call: the game must still pay exactly once.
         this.rewardGrants += 2;
@@ -67,15 +68,16 @@ export class MockPlatform implements Platform {
     }
   }
 
-  async showInterstitial(): Promise<InterstitialResult> {
+  async showInterstitial(hooks?: AdHooks): Promise<InterstitialResult> {
     if (this.adInFlight) return { status: 'unavailable' };
+    if (this.adMode === 'unavailable') return { status: 'unavailable' };
     this.adInFlight = true;
+    hooks?.onOpen?.();
     for (const cb of this.pauseCbs) cb();
     await new Promise((r) => setTimeout(r, this.delay));
     for (const cb of this.resumeCbs) cb();
     this.adInFlight = false;
     if (this.adMode === 'error') return { status: 'error' };
-    if (this.adMode === 'unavailable') return { status: 'unavailable' };
     if (this.adMode === 'closed') return { status: 'not_shown' };
     return { status: 'shown' };
   }

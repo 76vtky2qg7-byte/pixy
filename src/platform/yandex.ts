@@ -1,6 +1,6 @@
 import type { Payments, Player, SDK } from 'ysdk';
 import type {
-  InterstitialResult, Platform, PlatformInfo, PurchaseProduct, RewardedResult,
+  AdHooks, InterstitialResult, Platform, PlatformInfo, PurchaseProduct, RewardedResult,
 } from './types';
 
 /**
@@ -27,7 +27,15 @@ export const PRODUCT_IDS = { cosmetics: 'foreman_kit', adFree: 'no_forced_ads' }
 // signed/unsigned union that ReturnType<> would widen to.
 type Ysdk = SDK<false>;
 
-/** A callback-style ad call that never resolves is a hang; time it out. */
+/**
+ * Two watchdogs, because "the SDK went quiet" has two distinct shapes.
+ *
+ * OPEN_TIMEOUT_MS: no onOpen at all means no ad is coming. Give up quickly —
+ * the player is staring at a stalled button.
+ * AD_TIMEOUT_MS: the ad opened but never reported a close. Wait longer, since
+ * a real video is playing, but never wait forever.
+ */
+const OPEN_TIMEOUT_MS = 6_000;
 const AD_TIMEOUT_MS = 45_000;
 
 export function loadYandexSdk(timeoutMs = 12_000): Promise<Ysdk | null> {
@@ -139,11 +147,12 @@ export class YandexPlatform implements Platform {
    * resolves as 'closed'. Both callbacks can fire, in either order, and the SDK
    * may fire a callback twice — `settle` makes every path idempotent.
    */
-  showRewarded(): Promise<RewardedResult> {
+  showRewarded(hooks?: AdHooks): Promise<RewardedResult> {
     if (this.adInFlight) return Promise.resolve({ status: 'unavailable' });
     this.adInFlight = true;
     return new Promise<RewardedResult>((resolve) => {
       let rewarded = false;
+      let opened = false;
       let done = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -155,15 +164,24 @@ export class YandexPlatform implements Platform {
         resolve(result);
       };
 
-      timer = setTimeout(() => settle({ status: rewarded ? 'rewarded' : 'error' }), AD_TIMEOUT_MS);
+      // Until the ad opens, treat silence as "no ad available" and bail early.
+      timer = setTimeout(() => settle({ status: 'unavailable' }), OPEN_TIMEOUT_MS);
 
       try {
         this.sdk.adv.showRewardedVideo({
           callbacks: {
+            onOpen: () => {
+              opened = true;
+              if (timer) clearTimeout(timer);
+              timer = setTimeout(
+                () => settle({ status: rewarded ? 'rewarded' : 'closed' }), AD_TIMEOUT_MS);
+              hooks?.onOpen?.();
+            },
             onRewarded: () => { rewarded = true; },
             // Close is the terminal event; the reward flag decides the outcome.
             onClose: () => settle({ status: rewarded ? 'rewarded' : 'closed' }),
-            onError: (error) => settle({ status: 'error', error }),
+            onError: (error) => settle(
+              opened && rewarded ? { status: 'rewarded' } : { status: 'error', error }),
           },
         });
       } catch (error) {
@@ -172,7 +190,7 @@ export class YandexPlatform implements Platform {
     });
   }
 
-  showInterstitial(): Promise<InterstitialResult> {
+  showInterstitial(hooks?: AdHooks): Promise<InterstitialResult> {
     if (this.adInFlight) return Promise.resolve({ status: 'unavailable' });
     this.adInFlight = true;
     return new Promise<InterstitialResult>((resolve) => {
@@ -185,11 +203,16 @@ export class YandexPlatform implements Platform {
         this.adInFlight = false;
         resolve(r);
       };
-      timer = setTimeout(() => settle({ status: 'not_shown' }), AD_TIMEOUT_MS);
+      timer = setTimeout(() => settle({ status: 'not_shown' }), OPEN_TIMEOUT_MS);
 
       try {
         this.sdk.adv.showFullscreenAdv({
           callbacks: {
+            onOpen: () => {
+              if (timer) clearTimeout(timer);
+              timer = setTimeout(() => settle({ status: 'shown' }), AD_TIMEOUT_MS);
+              hooks?.onOpen?.();
+            },
             onClose: (wasShown) => settle({ status: wasShown ? 'shown' : 'not_shown' }),
             onError: (error) => settle({ status: 'error', error }),
             // Offline is not an error the player should ever see.

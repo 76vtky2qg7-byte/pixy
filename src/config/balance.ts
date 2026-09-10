@@ -73,8 +73,12 @@ export const SCALING = {
 export const CREDITS = {
   perWaveCleared: 6,
   contractWinBonus: 40,
+  /** Machines scrapped convert to credits at this rate, win or lose. */
+  killsPerCredit: 10,
   /** Losing still pays, so a failed attempt is never wasted time. */
   lossMultiplier: 0.5,
+  /** Floor for any finished attempt, however badly it went. */
+  minimumPayout: 5,
   /** Rewarded video doubles the total, at most once per finished contract. */
   rewardedMultiplier: 2,
 } as const;

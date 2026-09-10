@@ -1,0 +1,383 @@
+/* ------------------------------------------------------------------ *
+ * Sparkscrapper UI.
+ *
+ * The arena is a canvas; everything else is DOM. Text stays crisp and
+ * selectable-free, buttons get real hit targets, and Cyrillic renders
+ * properly at any size — none of which is true of canvas-drawn text.
+ * ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'Pixelify';
+  src: url('/fonts/pixelify-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
+}
+@font-face {
+  font-family: 'Pixelify';
+  src: url('/fonts/pixelify-cyrillic.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: block;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+:root {
+  /* One palette, shared with the sprite generator. */
+  --ink:        #05080f;
+  --bg:         #0b1018;
+  --panel:      #141c2e;
+  --panel-2:    #1c2740;
+  --line:       #33486a;
+  --line-soft:  #22304a;
+  --text:       #dbe6f7;
+  --text-dim:   #8fa2bf;
+  --amber:      #eda43f;
+  --amber-lt:   #ffd06a;
+  --copper:     #8f5220;
+  --arc:        #3fdcff;
+  --arc-dk:     #18a5c9;
+  --danger:     #e04a3c;
+  --good:       #59d98d;
+  --armour:     #a077d6;
+
+  --r: 4px;
+  --tap: 44px;                      /* minimum comfortable touch target */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Pixelify', 'Trebuchet MS', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#app { position: fixed; inset: 0; }
+
+/* ---- canvas ---- */
+#game-surface { position: absolute; inset: 0; background: var(--bg); }
+#game-canvas { position: absolute; inset: 0; }
+#game-canvas canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---- ui overlay ---- */
+#ui-root { position: absolute; inset: 0; pointer-events: none; }
+#ui-root > * { pointer-events: auto; }
+
+/* ------------------------------------------------------------------ *
+ * boot screen
+ * ------------------------------------------------------------------ */
+#boot {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; background: var(--ink); transition: opacity .35s ease;
+}
+#boot.hidden { opacity: 0; pointer-events: none; }
+.boot-logo {
+  font-size: clamp(26px, 8vw, 52px); letter-spacing: .14em; color: var(--amber);
+  text-shadow: 0 3px 0 var(--copper), 0 0 24px rgba(237,164,63,.35);
+}
+.boot-bar {
+  width: min(260px, 62vw); height: 10px; background: var(--panel);
+  border: 2px solid var(--line); border-radius: 2px; overflow: hidden;
+}
+.boot-bar i { display: block; height: 100%; width: 0; background: var(--amber); transition: width .2s ease; }
+.boot-text { color: var(--text-dim); font-size: 14px; }
+
+/* ------------------------------------------------------------------ *
+ * shared widgets
+ * ------------------------------------------------------------------ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 10px 18px;
+  font: inherit; font-size: 16px; color: var(--text);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 2px solid var(--line); border-radius: var(--r);
+  cursor: pointer; text-align: center;
+  transition: transform .06s ease, border-color .12s ease, background .12s ease;
+}
+.btn:hover:not(:disabled) { border-color: var(--amber); }
+.btn:active:not(:disabled) { transform: translateY(2px); }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--arc); outline-offset: 2px; }
+
+.btn.primary {
+  background: linear-gradient(180deg, var(--amber), var(--copper));
+  border-color: var(--amber-lt); color: #1b1207; font-weight: 700;
+}
+.btn.primary:hover:not(:disabled) { border-color: #fff2c8; }
+.btn.ghost { background: transparent; border-color: var(--line-soft); color: var(--text-dim); }
+.btn.danger { border-color: var(--danger); color: #ffc9c2; }
+.btn.wide { width: 100%; }
+.btn.sm { min-height: 34px; padding: 6px 12px; font-size: 14px; }
+
+.screen {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  background: var(--ink);
+  padding: calc(12px + var(--safe-t)) calc(12px + var(--safe-r)) calc(12px + var(--safe-b)) calc(12px + var(--safe-l));
+  gap: 10px; overflow: hidden;
+}
+.screen.overlay { background: rgba(5, 8, 15, .88); backdrop-filter: blur(2px); }
+
+.screen-head {
+  display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-height: 40px;
+}
+.screen-head h1 { margin: 0; font-size: clamp(18px, 5vw, 26px); letter-spacing: .06em; color: var(--amber); }
+.screen-head .spacer { flex: 1; }
+
+.screen-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.screen-foot { flex: 0 0 auto; display: flex; gap: 8px; }
+
+.card {
+  background: var(--panel); border: 2px solid var(--line-soft);
+  border-radius: var(--r); padding: 10px; margin-bottom: 8px;
+}
+.card.sel { border-color: var(--amber); background: var(--panel-2); }
+.card.locked { opacity: .55; }
+
+.row { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 6px; }
+.muted { color: var(--text-dim); font-size: 13px; }
+.tiny { font-size: 12px; }
+h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: .04em; }
+h3 { margin: 0 0 4px; font-size: 14px; color: var(--text-dim); letter-spacing: .06em; text-transform: uppercase; }
+
+/* Sprite-sheet icon: one <i> shows one 20x20 frame from icons.png. */
+.ico {
+  display: inline-block; width: 40px; height: 40px; flex: 0 0 auto;
+  background-image: var(--icons); background-repeat: no-repeat;
+  background-size: 280px 80px;    /* 7 cols x 2 rows at 2x */
+  image-rendering: pixelated;
+}
+.ico.sm { width: 24px; height: 24px; background-size: 168px 48px; }
+.cur {
+  display: inline-block; width: 16px; height: 16px; vertical-align: -3px;
+  background-image: var(--glyphs); background-size: 48px 16px;
+  background-repeat: no-repeat; image-rendering: pixelated;
+}
+.cur.scrap  { background-position: 0 0; }
+.cur.credit { background-position: -16px 0; }
+.cur.hp     { background-position: -32px 0; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px; font-size: 14px;
+  background: var(--panel); border: 2px solid var(--line-soft);
+}
+.pill.amber { border-color: var(--copper); color: var(--amber-lt); }
+.pill.arc { border-color: var(--arc-dk); color: var(--arc); }
+
+/* ------------------------------------------------------------------ *
+ * equipment panel (2 x 3)
+ * ------------------------------------------------------------------ */
+.panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  width: min(230px, 62vw);
+}
+.cell {
+  position: relative; aspect-ratio: 1; display: flex;
+  align-items: center; justify-content: center;
+  background: var(--panel); border: 2px dashed var(--line-soft);
+  border-radius: var(--r); cursor: pointer;
+  transition: border-color .12s, background .12s, transform .08s;
+  min-height: 56px;
+}
+.cell.filled { border-style: solid; border-color: var(--line); }
+.cell.weapon { border-color: var(--copper); }
+.cell.module { border-color: var(--arc-dk); }
+.cell.sel { border-color: var(--amber); background: var(--panel-2); transform: scale(1.05); }
+/* An adjacency link is shown on BOTH partners at once, so the rule reads as
+   a relationship rather than as a property of one cell. */
+.cell.linked { box-shadow: 0 0 0 2px var(--good) inset; }
+.cell.target { border-color: var(--good); animation: pulse .9s infinite; }
+.cell.idle::after {
+  content: '!'; position: absolute; top: 2px; right: 5px;
+  color: var(--danger); font-size: 14px; font-weight: 700;
+}
+@keyframes pulse { 50% { border-color: var(--amber); } }
+
+.cell .ico { width: 44px; height: 44px; background-size: 308px 88px; }
+.cell-idx {
+  position: absolute; bottom: 2px; left: 4px; font-size: 11px; color: var(--text-dim);
+}
+
+/* Link marks drawn between orthogonally adjacent cells. */
+.link {
+  position: absolute; background: var(--good); opacity: .85; pointer-events: none;
+  border-radius: 2px; z-index: 2;
+}
+
+/* ------------------------------------------------------------------ *
+ * shop
+ * ------------------------------------------------------------------ */
+.offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 8px; }
+.offer { display: flex; gap: 8px; align-items: flex-start; }
+.offer .meta { flex: 1; min-width: 0; }
+.offer .name { font-size: 14px; line-height: 1.2; }
+.offer .desc { font-size: 12px; color: var(--text-dim); line-height: 1.25; }
+.offer.sold { opacity: .45; }
+.price { display: inline-flex; align-items: center; gap: 4px; color: var(--amber-lt); font-size: 14px; }
+.price.cant { color: var(--danger); }
+
+/* Before/after comparison shown while choosing where to place a part. */
+.diff { margin-top: 6px; border-top: 1px solid var(--line-soft); padding-top: 6px; }
+.diff-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.diff .up { color: var(--good); }
+.diff .down { color: var(--danger); }
+.arrow { color: var(--text-dim); }
+
+/* ------------------------------------------------------------------ *
+ * HUD
+ * ------------------------------------------------------------------ */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#hud > * { pointer-events: none; }
+#hud .tappable { pointer-events: auto; }
+
+.hud-top {
+  position: absolute; top: calc(6px + var(--safe-t)); left: calc(8px + var(--safe-l));
+  right: calc(8px + var(--safe-r));
+  display: flex; align-items: flex-start; gap: 8px;
+}
+/* On a wide screen a full-width health bar is unreadable — it becomes a line
+   with no shape. Cap it and keep the rest of the row against the edges. */
+.hud-bars { flex: 1; min-width: 0; max-width: 420px; display: flex; flex-direction: column; gap: 4px; }
+.hud-top .hud-wave { margin-left: auto; }
+
+.bar {
+  position: relative; height: 14px; background: #0a0f1a;
+  border: 2px solid var(--line); border-radius: 3px; overflow: hidden;
+}
+.bar i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
+.bar.hp i { background: linear-gradient(180deg, #6ee79c, #2f9e63); }
+.bar.hp.low i { background: linear-gradient(180deg, #ff8a63, #a32b30); }
+.bar.od { height: 8px; }
+.bar.od i { background: linear-gradient(180deg, var(--amber-lt), var(--copper)); }
+.bar.boss { height: 12px; }
+.bar.boss i { background: linear-gradient(180deg, #ff8a63, #7a1f1a); }
+.bar span {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; text-shadow: 0 1px 0 #000; letter-spacing: .04em;
+}
+
+.hud-wave {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  font-size: 13px; text-shadow: 0 1px 0 #000;
+}
+.hud-timer { font-size: 20px; color: var(--amber-lt); }
+.hud-timer.urgent { color: var(--danger); }
+
+.hud-heat { position: absolute; left: calc(8px + var(--safe-l)); bottom: calc(84px + var(--safe-b)); display: flex; gap: 5px; }
+.heat-chip {
+  width: 26px; height: 30px; border: 2px solid var(--line); border-radius: 3px;
+  background: var(--panel); position: relative; overflow: hidden;
+}
+.heat-chip .fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+  background: var(--copper); transition: height .1s linear;
+}
+.heat-chip.hot { border-color: var(--danger); animation: pulse .5s infinite; }
+.heat-chip .ico { position: absolute; left: 1px; top: 3px; width: 22px; height: 22px; background-size: 154px 44px; }
+
+.hud-boss { position: absolute; top: calc(64px + var(--safe-t)); left: 12%; right: 12%; }
+.hud-boss .label { text-align: center; font-size: 12px; color: var(--danger); letter-spacing: .2em; }
+
+.btn-pause {
+  width: var(--tap); height: var(--tap); flex: 0 0 auto; padding: 0; font-size: 18px;
+}
+
+.hud-scrap {
+  position: absolute; top: calc(6px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px;
+}
+
+/* Virtual stick, drawn where the thumb landed. */
+#stick { position: absolute; inset: 0; pointer-events: none; }
+.stick-base, .stick-knob {
+  position: absolute; border-radius: 50%; transform: translate(-50%, -50%);
+  border: 2px solid rgba(219,230,247,.35); background: rgba(20,28,46,.4);
+}
+.stick-base { width: 104px; height: 104px; }
+.stick-knob { width: 46px; height: 46px; background: rgba(237,164,63,.4); border-color: var(--amber); }
+
+.toast {
+  position: absolute; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%);
+  background: var(--panel); border: 2px solid var(--line); border-radius: var(--r);
+  padding: 8px 14px; font-size: 14px; max-width: 88vw; text-align: center;
+  opacity: 0; transition: opacity .2s ease; z-index: 60;
+}
+.toast.show { opacity: 1; }
+
+/* Tutorial coach mark. */
+.coach {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(110px + var(--safe-b)); width: min(420px, 92vw); z-index: 70;
+  background: var(--panel-2); border: 2px solid var(--amber); border-radius: var(--r);
+  padding: 12px 14px; box-shadow: 0 6px 0 rgba(0,0,0,.5);
+}
+.coach p { margin: 0 0 10px; font-size: 15px; line-height: 1.4; }
+.coach .row { justify-content: flex-end; }
+
+/* ------------------------------------------------------------------ *
+ * results
+ * ------------------------------------------------------------------ */
+.result-title { font-size: clamp(20px, 6vw, 30px); text-align: center; letter-spacing: .08em; }
+.result-title.win { color: var(--good); }
+.result-title.lose { color: var(--danger); }
+.tally { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.tally.total { border-bottom: none; border-top: 2px solid var(--line); margin-top: 4px; padding-top: 8px; font-size: 17px; color: var(--amber-lt); }
+
+/* ------------------------------------------------------------------ *
+ * settings
+ * ------------------------------------------------------------------ */
+.setting { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+.setting label { flex: 1; font-size: 15px; }
+.seg { display: inline-flex; border: 2px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button {
+  min-height: 36px; padding: 6px 14px; font: inherit; font-size: 14px;
+  background: var(--panel); color: var(--text-dim); border: 0; cursor: pointer;
+}
+.seg button.on { background: var(--amber); color: #1b1207; }
+input[type=range] { flex: 1; min-width: 90px; accent-color: var(--amber); height: var(--tap); }
+
+/* ------------------------------------------------------------------ *
+ * layout: wide screens get two columns instead of a long scroll
+ * ------------------------------------------------------------------ */
+@media (min-width: 720px) and (orientation: landscape) {
+  .screen { padding-left: calc(24px + var(--safe-l)); padding-right: calc(24px + var(--safe-r)); }
+  .two-col { display: grid; grid-template-columns: minmax(240px, 300px) 1fr; gap: 16px; align-items: start; }
+  .two-col > * { min-width: 0; }
+  .grid { width: 100%; max-width: 260px; }
+  .screen-body { padding-right: 6px; }
+}
+
+/* Very short landscape (a phone turned sideways): tighten everything. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .screen { gap: 6px; padding-top: calc(6px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
+  .screen-head h1 { font-size: 18px; }
+  .card { padding: 7px; margin-bottom: 6px; }
+  .btn { min-height: 38px; padding: 7px 14px; font-size: 15px; }
+  .cell { min-height: 44px; }
+  .grid { width: min(180px, 30vw); }
+  .coach { bottom: calc(70px + var(--safe-b)); padding: 9px 12px; }
+  .coach p { font-size: 13px; margin-bottom: 7px; }
+}
+
+/* Reduced motion: kill the pulses, keep the information. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

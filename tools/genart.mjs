@@ -129,6 +129,16 @@ scene.blit(W.pickupSpark(0), 50, 44);
 scene.frame(0, 0, 64, 64, '#0a0f1c');
 write('store_icon', upscale(scene, 8), 512, 512);
 
+/* ---- favicon: the hero robot on a dark plate, at 64px ---- */
+const fav = new Pix(32, 32);
+fav.rect(0, 0, 32, 32, '#12182a');
+fav.frame(0, 0, 32, 32, '#0a0f1c');
+fav.glow(16, 18, 13, '#c47a2c', 90);
+fav.blit(A.heroScrap(0), 0, 1);
+const favFile = path.join(ROOT, 'public', 'favicon.png');
+fs.mkdirSync(path.dirname(favFile), { recursive: true });
+fs.writeFileSync(favFile, upscale(fav, 2).toPNG());
+
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const total = Object.keys(manifest).reduce((n, k) => n + fs.statSync(path.join(OUT, k + '.png')).size, 0);
 console.log(`generated ${Object.keys(manifest).length} sheets, ${(total / 1024).toFixed(1)} KB total`);
