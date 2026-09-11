@@ -44,6 +44,8 @@ export interface PreviewSummary {
   cell: number;
   gear: GearId | null;
   rows: { weapon: WeaponId; stat: StatKey; before: number; after: number }[];
+  /** Set when the diff describes taking this part OUT rather than putting one in. */
+  removing?: GearId;
 }
 
 const STAT_ORDER: StatKey[] = [
@@ -136,7 +138,11 @@ export class EquipmentPanel {
       if (!this.slots[index]) return;   // nothing to pick up from an empty cell
       this.selected = index;
       this.cb.onSelect?.(index);
-      this.cb.onPreview?.(this.previewFor(index, this.slots[index]));
+      // Preview REMOVING this part, not replacing it with itself. "What does
+      // this cell currently do for me" is the question a player is asking when
+      // they tap it; previewing it against itself produces an empty diff and
+      // used to render as "not connected to a weapon", which is simply wrong.
+      this.cb.onPreview?.({ ...this.previewFor(index, null), removing: this.slots[index] });
       this.render();
       return;
     }
@@ -331,13 +337,36 @@ export function formatStat(stat: StatKey, value: number): string {
 export const statIsGood = (stat: StatKey, before: number, after: number): boolean =>
   stat === 'heatGain' ? after < before : after > before;
 
-/** Build the before/after block shown under a selected part. */
+/**
+ * Before/after block.
+ *
+ * When `removing` is set the diff is read backwards — before is what the panel
+ * does now, after is what it would do without this part — so the arrow shows
+ * what the player would lose. The rows are flipped for display so the current
+ * value always sits on the left.
+ */
 export function diffElement(summary: PreviewSummary): HTMLElement {
   const box = el('div', { class: 'diff' });
+
   if (!summary.rows.length) {
-    box.append(el('div', { class: 'muted tiny', text: t('idleModule') }));
+    // An empty diff means two very different things; say which.
+    const gear = summary.removing ?? summary.gear;
+    const isIdleModule = !!gear && isModule(gear);
+    box.append(el('div', {
+      class: 'muted tiny',
+      text: isIdleModule ? t('idleModule') : t('noChange'),
+    }));
     return box;
   }
+
+  if (summary.removing) {
+    box.append(el('div', {
+      class: 'tiny',
+      style: 'color:var(--text-dim);margin-bottom:4px',
+      text: t('ifRemoved', { name: tk('gear', summary.removing) }),
+    }));
+  }
+
   for (const r of summary.rows) {
     const good = statIsGood(r.stat, r.before, r.after);
     box.append(el('div', { class: 'diff-row' },

@@ -17,15 +17,15 @@ game's own generated sprites and font — none are mock-ups.
 | `screenshots/1-menu-1366x768.png` | PNG | 1366 | 768 | 121.7 KB |
 | `screenshots/1-menu-360x800.png` | PNG | 720 | 1600 | 162.8 KB |
 | `screenshots/1-menu-390x844.png` | PNG | 1170 | 2532 | 284.3 KB |
-| `screenshots/2-combat-1366x768.png` | PNG | 1366 | 768 | 49.7 KB |
-| `screenshots/2-combat-360x800.png` | PNG | 720 | 1600 | 64.9 KB |
-| `screenshots/2-combat-390x844.png` | PNG | 1170 | 2532 | 86.4 KB |
-| `screenshots/3-panel-1366x768.png` | PNG | 1366 | 768 | 69.5 KB |
-| `screenshots/3-panel-360x800.png` | PNG | 720 | 1600 | 62.8 KB |
-| `screenshots/3-panel-390x844.png` | PNG | 1170 | 2532 | 91.2 KB |
-| `screenshots/4-boss-1366x768.png` | PNG | 1366 | 768 | 41.8 KB |
-| `screenshots/4-boss-360x800.png` | PNG | 720 | 1600 | 56.7 KB |
-| `screenshots/4-boss-390x844.png` | PNG | 1170 | 2532 | 84.1 KB |
+| `screenshots/2-combat-1366x768.png` | PNG | 1366 | 768 | 47.7 KB |
+| `screenshots/2-combat-360x800.png` | PNG | 720 | 1600 | 64.3 KB |
+| `screenshots/2-combat-390x844.png` | PNG | 1170 | 2532 | 85.7 KB |
+| `screenshots/3-panel-1366x768.png` | PNG | 1366 | 768 | 69.1 KB |
+| `screenshots/3-panel-360x800.png` | PNG | 720 | 1600 | 59.4 KB |
+| `screenshots/3-panel-390x844.png` | PNG | 1170 | 2532 | 90.8 KB |
+| `screenshots/4-boss-1366x768.png` | PNG | 1366 | 768 | 43.8 KB |
+| `screenshots/4-boss-360x800.png` | PNG | 720 | 1600 | 65.1 KB |
+| `screenshots/4-boss-390x844.png` | PNG | 1170 | 2532 | 94 KB |
 | `screenshots/5-workshop-1366x768.png` | PNG | 1366 | 768 | 58.2 KB |
 | `screenshots/5-workshop-360x800.png` | PNG | 720 | 1600 | 62.1 KB |
 | `screenshots/5-workshop-390x844.png` | PNG | 1170 | 2532 | 92.9 KB |
@@ -33,7 +33,32 @@ game's own generated sprites and font — none are mock-ups.
 | `screenshots/6-contracts-360x800.png` | PNG | 720 | 1600 | 82.9 KB |
 | `screenshots/6-contracts-390x844.png` | PNG | 1170 | 2532 | 120.3 KB |
 
-Total: 21 images, 2.32 MB.
+Total: 21 images, 2.34 MB.
+
+## Video
+
+Real screen recordings of the production build, captured in Chromium.
+Input goes through the game's normal touch path, so the on-screen stick is
+visible and the movement is genuine. The run is **staged the way any trailer
+is** — it starts at a dense mid-contract wave, the shop is seeded so the
+Battery is on offer, and waves are ended on cue instead of played out in
+full. The mechanics shown are not staged: the adjacency link, the stat
+change and the faster firing afterwards are the game doing its normal job.
+
+| File | Codec | Width | Height | Duration | Size |
+|---|---|---|---|---|---|
+| `video/gameplay-desktop-1366x768.webm` | vp8 | 1366 | 768 | 34.4s | 3738.5 KB |
+| `video/gameplay-portrait-390x844.webm` | vp8 | 390 | 844 | 34.4s | 3133.2 KB |
+
+Only **WebM/VP8** could be produced here: the ffmpeg bundled with the
+browser is a minimal build with no H.264 encoder, so there is no MP4. If the
+draft form requires MP4, convert with a full ffmpeg:
+
+```bash
+ffmpeg -i gameplay-portrait-390x844.webm -c:v libx264 -crf 20 -pix_fmt yuv420p gameplay.mp4
+```
+
+Shot list and timings: `store/VIDEO_SCRIPT.md`.
 
 ## What each one is for
 

@@ -335,6 +335,27 @@ Ordered by how they were caught.
    now taken when the ad *opens*, not when it is *requested*, and a 6-second
    watchdog gives up if it never opens.
 
+### Found while building the video, and worth fixing regardless
+
+20. **Tapping a filled cell explained the wrong thing.** Selecting a cell
+    previewed replacing it *with itself*, which produces an empty diff and
+    rendered as "not connected to a weapon" — actively misleading for a module
+    that was working perfectly. A tap now previews *removing* the part, which
+    answers the question a player is actually asking ("what is this doing for
+    me?"): selecting the Battery now reads "Without Battery: Riveter · fire
+    rate +25% → —". An empty diff also now distinguishes "this module touches
+    no weapon" from "this changes nothing".
+
+21. **Hovering a shop card silently overrode an explicit cell selection**, so
+    the explanation panel described a part the player had not asked about. An
+    explicit tap now outranks a passive hover, and moving off a card restores
+    whatever the selection was showing.
+
+22. **The explanation sat below the shop**, so reading it scrolled the panel off
+    screen — and on the way, a shop card slid under the cursor and replaced the
+    diff. It now renders directly under the panel, so the link and the numbers
+    are visible together without scrolling.
+
 ### Found by external code review, then fixed and tested here
 
 15. **The SDK was loaded from the wrong URL.** The adapter used
@@ -409,7 +430,7 @@ and live inventory, and I will not claim otherwise.
 | **Interstitial pacing** | The rule (results screen only, never the first session, every 2nd contract, 180s cooldown) is implemented and configurable in `src/config/balance.ts`, but must be checked against the platform's current policy. |
 | **Purchases** | No catalogue exists, so `getCatalog()` returns empty and the UI hides itself. **Payments are not verified.** Products, prices, entitlement grants and restore-across-devices all need a configured catalogue. |
 | **Cloud saves** | Verified against a scripted `player.setData`/`getData`. Real rate limits, the guest-mode slot, and cross-device behaviour are unverified. |
-| **Real devices** | Everything reported here is **desktop Chromium with software rendering, emulating phone viewports**. No physical phone or tablet was used. Touch was synthesised. Frame rates on real hardware — especially low-end Android — are unknown. |
+| **Real devices** | Everything reported here is **desktop Chromium with software rendering, emulating phone viewports**. No physical phone or tablet was used. Touch was synthesised — including in the recorded video, where the on-screen stick is driven by synthetic pointer events rather than a thumb. Frame rates on real hardware, especially low-end Android, are unknown. |
 | **Leaderboards, shortcuts, reviews** | Not implemented, deliberately, for a first release. |
 | **Name availability** | "Искролом" / "Sparkscrapper" has not been checked against the catalogue. |
 | **Moderation** | Nothing has been submitted. No claim about passing review. |
@@ -437,13 +458,31 @@ checked with a configured catalogue in a draft.
 
 ## Video
 
-**No gameplay video was recorded**, and none was faked from stills. Screen
-capture is not available in this environment. The screenshots in
-`store/screenshots/` are real frames of the built game.
+**Two gameplay videos were recorded** — 34 seconds each, portrait 390x844 and
+desktop 1366x768, in `store/video/`.
 
-`store/VIDEO_SCRIPT.md` is a shot-by-shot 30-second script so the owner can
-record it in one take, and `store/MEDIA.md` lists every image with its measured
-dimensions and file size.
+I previously reported that video capture was not available here. That was
+wrong, and it was wrong because I asserted it without checking: Playwright
+records video natively and the ffmpeg it needs ships with the browser bundle.
+
+Every frame is the production build running in Chromium. Input goes through the
+game's normal touch path — synthesised pointer events driving the on-screen
+stick — so the stick is visible and the movement is real, not a camera path.
+
+The run is **staged, the way any trailer is**, and this is worth stating
+plainly: it starts at a dense mid-contract wave rather than the quiet first one,
+the shop is seeded so the Battery is on offer, and waves are ended on cue
+instead of played out in full. What is *not* staged is any mechanic — the
+adjacency link, the "+25% fire rate" the panel reports, and the visibly faster
+firing in the next wave are all the game doing its ordinary job. No page errors
+occurred during either recording.
+
+Only **WebM/VP8** could be produced: the bundled ffmpeg is a minimal build with
+no H.264 encoder. `store/MEDIA.md` gives the conversion command if the draft
+form needs MP4.
+
+`store/VIDEO_SCRIPT.md` holds the shot list, and `store/MEDIA.md` lists every
+image and video with measured dimensions, duration and file size.
 
 ## Where to start
 

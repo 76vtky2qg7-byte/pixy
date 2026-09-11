@@ -89,9 +89,11 @@ export function mountPrep(ctx: AppContext): () => void {
       meta.append(buyRow);
 
       card.append(iconEl(def.icon), meta);
-      // Hovering or tapping the card previews where it would go.
+      // Hovering previews where the part would go — but only when the player
+      // has not explicitly selected a cell. A passive hover must not silently
+      // replace what an explicit tap asked to see.
       card.addEventListener('pointerenter', () => previewGear(offer.gear));
-      card.addEventListener('pointerleave', () => renderDetail(null));
+      card.addEventListener('pointerleave', () => restoreDetail());
       offersBox.append(card);
     }
   }
@@ -174,9 +176,17 @@ export function mountPrep(ctx: AppContext): () => void {
   }
 
   function previewGear(gear: GearId): void {
+    if (panel.selectedCell !== null) return;   // an explicit selection wins
     // Show what the part would do in the first empty cell, or cell 0.
     const target = run!.slots.findIndex((x) => x === null);
     renderDetail(panel.previewFor(target >= 0 ? target : 0, gear));
+  }
+
+  /** Go back to whatever the panel selection was showing, if anything. */
+  function restoreDetail(): void {
+    const sel = panel.selectedCell;
+    if (sel === null || !run!.slots[sel]) { renderDetail(null); return; }
+    renderDetail({ ...panel.previewFor(sel, null), removing: run!.slots[sel]! });
   }
 
   /* ---------------- explanation ---------------- */
@@ -190,8 +200,10 @@ export function mountPrep(ctx: AppContext): () => void {
       );
       return;
     }
-    const label = diff.gear ? tk('gear', diff.gear) : t('emptyCell');
-    detailBox.append(el('h3', { text: `${label} → ${t('chooseCell')} ${diff.cell + 1}` }));
+    const label = diff.removing
+      ? tk('gear', diff.removing)
+      : diff.gear ? tk('gear', diff.gear) : t('emptyCell');
+    detailBox.append(el('h3', { text: `${label} · ${t('effect')}` }));
     detailBox.append(diffElement(diff));
   }
 
@@ -263,11 +275,15 @@ export function mountPrep(ctx: AppContext): () => void {
   // Three blocks. In portrait they stack in DOM order — panel, then shop, so
   // the offers are on screen without scrolling past the explanation. On a wide
   // screen CSS grid puts the shop in its own column beside both.
+  // The explanation sits directly under the panel, not below the shop: it
+  // describes the cell the player just tapped, and putting it a scroll away
+  // meant reading it required scrolling the panel off screen.
   const panelBlock = el('div', { class: 'prep-panel col' },
     el('h3', { text: t('equipment') }),
     panel.root,
     hintBox,
     el('div', { class: 'row', style: 'justify-content:center;gap:6px' }, sellBtn, cancelBtn),
+    detailBox,
   );
   const shopBlock = el('div', { class: 'prep-shop col' },
     el('div', { class: 'row' },
@@ -276,7 +292,7 @@ export function mountPrep(ctx: AppContext): () => void {
     ),
     offersBox,
   );
-  const infoBlock = el('div', { class: 'prep-info col' }, detailBox, comboBox);
+  const infoBlock = el('div', { class: 'prep-info col' }, comboBox);
 
   s.body.append(el('div', { class: 'prep-layout' }, panelBlock, shopBlock, infoBlock));
   s.foot.append(startBtn);

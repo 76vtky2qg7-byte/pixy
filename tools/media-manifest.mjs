@@ -4,6 +4,7 @@
  *
  *   node tools/media-manifest.mjs
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,16 +22,47 @@ function pngSize(file) {
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
 
-function walk(dir, base = '') {
+function walk(dir, base = '', ext = '.png') {
   const out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const rel = base ? `${base}/${e.name}` : e.name;
     const abs = path.join(dir, e.name);
-    if (e.isDirectory()) out.push(...walk(abs, rel));
-    else if (e.name.endsWith('.png')) out.push({ rel, abs });
+    if (e.isDirectory()) out.push(...walk(abs, rel, ext));
+    else if (e.name.endsWith(ext)) out.push({ rel, abs });
   }
   return out;
 }
+
+/** Read the video's real dimensions and duration out of the container. */
+function videoInfo(file) {
+  const FF = process.env.E2E_FFMPEG || '/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux';
+  try {
+    const out = execFileSync(FF, ['-hide_banner', '-i', file], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return parseFfmpeg(out);
+  } catch (err) {
+    // ffmpeg exits non-zero when given no output file; its report is on stderr.
+    return parseFfmpeg(String(err.stderr ?? ''));
+  }
+}
+
+function parseFfmpeg(text) {
+  const dim = /,\s(\d{2,5})x(\d{2,5})[,\s]/.exec(text);
+  const dur = /Duration:\s*(\d+):(\d+):(\d+\.\d+)/.exec(text);
+  const codec = /Video:\s*([a-z0-9]+)/i.exec(text);
+  return {
+    width: dim ? +dim[1] : 0,
+    height: dim ? +dim[2] : 0,
+    seconds: dur ? +(+dur[1] * 3600 + +dur[2] * 60 + +dur[3]).toFixed(1) : 0,
+    codec: codec ? codec[1] : '?',
+  };
+}
+
+const videos = walk(STORE, '', '.webm').map((f) => {
+  const info = videoInfo(f.abs);
+  return { file: f.rel, ...info, kb: +(fs.statSync(f.abs).size / 1024).toFixed(1) };
+}).sort((a, b) => a.file.localeCompare(b.file));
 
 const rows = walk(STORE).map((f) => {
   const size = pngSize(f.abs);
@@ -62,6 +94,30 @@ const lines = [
   '',
   `Total: ${rows.length} images, ${(rows.reduce((n, r) => n + r.kb, 0) / 1024).toFixed(2)} MB.`,
   '',
+  '## Video',
+  '',
+  'Real screen recordings of the production build, captured in Chromium.',
+  'Input goes through the game\'s normal touch path, so the on-screen stick is',
+  'visible and the movement is genuine. The run is **staged the way any trailer',
+  'is** — it starts at a dense mid-contract wave, the shop is seeded so the',
+  'Battery is on offer, and waves are ended on cue instead of played out in',
+  'full. The mechanics shown are not staged: the adjacency link, the stat',
+  'change and the faster firing afterwards are the game doing its normal job.',
+  '',
+  '| File | Codec | Width | Height | Duration | Size |',
+  '|---|---|---|---|---|---|',
+  ...videos.map((v) => `| \`${v.file}\` | ${v.codec} | ${v.width} | ${v.height} | ${v.seconds}s | ${v.kb} KB |`),
+  '',
+  'Only **WebM/VP8** could be produced here: the ffmpeg bundled with the',
+  'browser is a minimal build with no H.264 encoder, so there is no MP4. If the',
+  'draft form requires MP4, convert with a full ffmpeg:',
+  '',
+  '```bash',
+  'ffmpeg -i gameplay-portrait-390x844.webm -c:v libx264 -crf 20 -pix_fmt yuv420p gameplay.mp4',
+  '```',
+  '',
+  'Shot list and timings: `store/VIDEO_SCRIPT.md`.',
+  '',
   '## What each one is for',
   '',
   '| File | Purpose |',
@@ -82,5 +138,6 @@ const lines = [
 ];
 
 fs.writeFileSync(path.join(STORE, 'MEDIA.md'), lines.join('\n'));
-console.log(`store/MEDIA.md — ${rows.length} images`);
+console.log(`store/MEDIA.md — ${rows.length} images, ${videos.length} videos`);
+for (const v of videos) console.log(`  ${v.width}x${v.height}  ${v.seconds}s  ${v.kb} KB  ${v.file} (${v.codec})`);
 for (const r of rows) console.log(`  ${String(r.width).padStart(5)}x${String(r.height).padEnd(5)} ${String(r.kb).padStart(7)} KB  ${r.file}`);
