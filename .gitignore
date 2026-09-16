@@ -7,3 +7,6 @@ dist/
 # yandex-build.zip is committed on purpose: it is the deliverable a reviewer
 # uploads, and it should be obtainable without running a build. Regenerate it
 # with `npm run release`.
+
+# Assembled from files already in the repo by tools/pack-delivery.mjs.
+iskrolom-yandex-upload.zip
