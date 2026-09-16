@@ -12,10 +12,15 @@ Three layers of checking, in order of how much they prove:
 
 1. **129 unit tests** (`npm test`) — adjacency, economy, saves, pause manager,
    and the ad lifecycle.
-2. **62 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
+2. **66 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
    build**, driven in Chromium, with a fake Yandex SDK injected before boot so
    the **real** shipped adapter is what runs.
-3. **Manual inspection of rendered frames** — screenshots read and judged, which
+3. **Three pre-flight audits** (`npm run audit:static`, `audit:browser`,
+   `audit:iframe`) — text and licence sanity, then layout at ten viewport
+   sizes in both languages, glyph coverage, dead buttons, console errors and
+   network egress against the production build, and finally the game embedded
+   in a genuinely cross-origin iframe, including with storage blocked.
+4. **Manual inspection of rendered frames** — screenshots read and judged, which
    is how the rendering bugs listed below were found. None of them failed a
    test; they were all visible and only visible.
 
@@ -97,7 +102,7 @@ write leaves local progress untouched**; conflicts resolve by revision and
 
 ---
 
-## 2. End-to-end checks — 62 passed, 0 failed
+## 2. End-to-end checks — 66 passed, 0 failed
 
 Run against `dist/` served by `vite preview`, in Chromium 1194, at
 390×844 dsf 3 (touch), 360×800, 1366×768 and 844×390.
@@ -221,7 +226,70 @@ gets a working game.**
 
 ---
 
-## 3. Packaging
+## 3. Pre-flight audits
+
+Three scripts, run against the production build. They exist to catch the things
+a moderator sees first and no functional test looks at: text that does not fit,
+characters in the wrong font, controls that do nothing, and anything that
+leaves the origin.
+
+### `npm run audit:static` — no findings
+
+Reads the source and the built bundle, not a browser.
+
+| Check | Result |
+|---|---|
+| RU and EN string tables in sync | pass — 222 keys, none missing on either side |
+| No Russian left untranslated in the English table | pass |
+| Every `t()` / `tk()` key exists | pass |
+| Every character the UI shows is inside a declared `unicode-range` | pass — ranges are read from `style.css`, not copied |
+| Store card title is a single line, no slash or emoji | pass |
+| Store card short description within 100 characters | pass — 70 RU, 73 EN |
+| Offline claim scoped to "after the page has loaded" | pass |
+| No URL in the bundle that is fetched from another origin | pass — the only URL-shaped strings are a Phaser banner and XML namespaces |
+| Font licence present in the build | pass |
+| Every promised deliverable exists on disk | pass |
+
+### `npm run audit:browser` — no findings
+
+Ten viewport sizes from 320×568 to 1920×1080, including phone landscape and
+tablet portrait, in both languages, across six screens.
+
+| Check | Result |
+|---|---|
+| Text that overflows its box, is clipped, or runs off screen | pass — 120 screen/size/language combinations |
+| Every character renders in the bundled pixel font | pass — compared by rendering to canvas and diffing pixels, not by advance width |
+| Buttons that do nothing when pressed | pass — 25 buttons exercised; radio options already selected are excluded, since those are meant to be inert |
+| Console errors and uncaught exceptions | pass |
+| Requests that leave the origin | pass — none |
+| The game still reaches a screen with no SDK, and reports its platform as `none` | pass |
+
+This is the run that found the missing `О` and `П`.
+
+### `npm run audit:iframe` — no findings
+
+Yandex serves a game in a cross-origin iframe, where storage can be
+partitioned, keyboard events need frame focus, and the canvas is sized by the
+host. The audit runs a small server that embeds the game from a genuinely
+different origin (`localhost` framing `127.0.0.1`).
+
+| Check | Result |
+|---|---|
+| Boots inside a cross-origin iframe | pass |
+| Progress is recorded when embedded | pass |
+| Keyboard reaches the game after a click into the frame | pass |
+| Virtual stick responds to touch, and `pointercancel` releases it | pass — residual input 0 |
+| The simulation actually runs | pass |
+| The canvas gets a real size | pass — 420×760 |
+| Boots and plays with `localStorage` and `sessionStorage` throwing | pass — progress is kept in memory; only persistence across a reload is lost |
+
+The blocked-storage case models a browser set to refuse third-party storage.
+It was verified that the block really takes effect, so the pass is not a
+vacuous one.
+
+---
+
+## 4. Packaging
 
 | Check | Result |
 |---|---|
@@ -280,7 +348,7 @@ from this environment** — see the note at the top):
 The packer enforces both the 100 MB platform limit and our own 20 MB target,
 and fails rather than writing an archive that breaks either.
 
-## 4. Screens inspected visually
+## 5. Screens inspected visually
 
 Screenshots captured and read at **360×800, 390×844 and 1366×768** (menu,
 contracts, prep, combat, results). Rendered frames were examined, not just
@@ -313,31 +381,73 @@ Ordered by how they were caught.
 4. **The health bar spanned the full width of a desktop screen**, becoming a
    line with no readable shape. Capped at 420px.
 
+### Found by the pre-flight audits
+
+5. **The bundled pixel font had no `О` and no `П`.** Not a subsetting mistake
+   on our side — the released Pixelify Sans genuinely ships no glyph for
+   U+041E or U+041F, which was confirmed against the upstream file. Those are
+   two of the commonest capitals in Russian, so words like **ОПАСНО**,
+   **ПОБЕДА**, **ОТМЕНА** and **ПАУЗА** were rendering with a system serif
+   substituted mid-word. The CSS `unicode-range` declared the range, so nothing
+   that reads the stylesheet could have caught it; only rendering the
+   characters and comparing pixels did.
+
+   Fixed in `tools/genfont.py` by deriving the missing glyphs from ones already
+   in the font, so they keep its proportions and its weight-axis variation:
+   `О` is the Latin `O` outline, `П` is `п` raised to cap height. `→`, `✔` and
+   `★` were missing too and are drawn as pixel bitmaps on the font's own grid.
+   The result is a derivative, so the internal family name was changed and
+   `ASSET_LICENSES.md` records what was altered.
+
+6. **The page title read `Искролом / Sparkscrapper`.** One title carrying two
+   names with a slash reads as two games. It now follows the interface
+   language — `Искролом` or `Sparkscrapper`, matching the name on each store
+   card and on the menu screen — with the Russian name as the static default in
+   `index.html`.
+
+The same audits were also wrong twice about the game, and both were fixed in
+the audit rather than the code:
+
+- A `/sdk.js` **404 was reported as a console error at every viewport size.**
+  It is expected: Yandex serves that file from the host root and nothing off
+  the platform can. The audit now tracks failed requests by URL instead of
+  pattern-matching the browser's message, which carries no URL, and asserts the
+  thing that actually matters — that the game still reaches a screen and
+  reports its platform as `none` rather than claiming an SDK it does not have.
+- The **language button "Русский" was flagged as doing nothing.** It is a radio
+  group, and it was already on Russian; re-selecting the current option is
+  meant to be inert. The sweep now skips options with `aria-checked="true"`.
+
+A third rule was replaced outright: glyph coverage was being tested by
+comparing advance widths, which agree by coincidence often enough to produce
+both false alarms and false silence. It now renders each character to a canvas
+twice and compares pixels.
+
 ### Found by end-to-end checks
 
-5. **Two screens could be live at once.** Screens are code-split, so `show()`
+7. **Two screens could be live at once.** Screens are code-split, so `show()`
    mounts asynchronously; two calls in quick succession both appended their
    screen, because the second one's `clear()` ran before the first one's
    `import()` resolved. Mounts now carry a token and a superseded mount tears
    itself down. This is exactly the class of bug the 20-transition check exists
    to catch.
-6. **The tutorial silently died after the first screen change.** A screen change
+8. **The tutorial silently died after the first screen change.** A screen change
    clears `#ui-root`, detaching an open coach mark; the tutorial still believed
    a step was on screen and refused every later hint for the rest of the
    session. Added a screen-change hook, and a scrim so a pausing hint actually
    blocks what is under it (previously the player could start the wave out from
    under the hint, stranding a pause reason).
-7. **Losing wave one paid zero credits**, so the "double your credits" button
+9. **Losing wave one paid zero credits**, so the "double your credits" button
    offered to double nothing. Kills now pay, with a floor for any finished
    attempt, and the ad prompt is hidden entirely when there is nothing to
    double.
-8. **An SDK that never called back froze the game for 45 seconds.** The pause is
-   now taken when the ad *opens*, not when it is *requested*, and a 6-second
-   watchdog gives up if it never opens.
+10. **An SDK that never called back froze the game for 45 seconds.** The pause is
+    now taken when the ad *opens*, not when it is *requested*, and a 6-second
+    watchdog gives up if it never opens.
 
 ### Found while building the video, and worth fixing regardless
 
-20. **Tapping a filled cell explained the wrong thing.** Selecting a cell
+11. **Tapping a filled cell explained the wrong thing.** Selecting a cell
     previewed replacing it *with itself*, which produces an empty diff and
     rendered as "not connected to a weapon" — actively misleading for a module
     that was working perfectly. A tap now previews *removing* the part, which
@@ -346,19 +456,19 @@ Ordered by how they were caught.
     rate +25% → —". An empty diff also now distinguishes "this module touches
     no weapon" from "this changes nothing".
 
-21. **Hovering a shop card silently overrode an explicit cell selection**, so
+12. **Hovering a shop card silently overrode an explicit cell selection**, so
     the explanation panel described a part the player had not asked about. An
     explicit tap now outranks a passive hover, and moving off a card restores
     whatever the selection was showing.
 
-22. **The explanation sat below the shop**, so reading it scrolled the panel off
+13. **The explanation sat below the shop**, so reading it scrolled the panel off
     screen — and on the way, a shop card slid under the cursor and replaced the
     diff. It now renders directly under the panel, so the link and the numbers
     are visible together without scrolling.
 
 ### Found by external code review, then fixed and tested here
 
-15. **The SDK was loaded from the wrong URL.** The adapter used
+14. **The SDK was loaded from the wrong URL.** The adapter used
     `https://yandex.ru/games/sdk/v2`. A build served by Yandex from a ZIP
     exposes the SDK at the root path **`/sdk.js`**. This would have failed at
     the first hurdle in a real draft, and no amount of local testing would have
@@ -366,17 +476,17 @@ Ordered by how they were caught.
     `/sdk.js`, with the self-hosted form exported alongside it, and the packer
     asserts the built bundle actually references it.
 
-16. **The pause could be released while an ad was still on screen.** A 45-second
+15. **The pause could be released while an ad was still on screen.** A 45-second
     watchdog resolved the promise, and the caller cleared the `ad` pause in a
     `finally`. Any rewarded video longer than 45 seconds would have resumed the
     game — sound, simulation and all — underneath the ad.
 
-17. **A late `onOpen` could freeze the game permanently.** After the 6-second
+16. **A late `onOpen` could freeze the game permanently.** After the 6-second
     open timeout the promise resolved and the caller cleared the `ad` pause. If
     the host then opened the ad, `onOpen` set the pause again with nothing left
     to clear it. The game would sit paused forever.
 
-18. **A finished request released the in-flight guard while its ad was still
+17. **A finished request released the in-flight guard while its ad was still
     up**, so a second tap could stack a second ad; and a stale request's late
     callbacks could resolve a newer request.
 
@@ -388,28 +498,28 @@ Ordered by how they were caught.
     as a real recovery signal when `onClose` is lost, with a long backstop only
     for a host that provides neither.
 
-19. **The game did not work offline, while the store card said it did.** See the
+18. **The game did not work offline, while the store card said it did.** See the
     offline section above.
 
 ### Found by the balance harness
 
-9. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
-   the Cutter Beam's 2.6-damage tick into 1, which reads as the weapon being
-   broken rather than as a reason to fit a Piston. Armour now floors at 25% of
-   the raw hit.
-10. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
+19. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
+    the Cutter Beam's 2.6-damage tick into 1, which reads as the weapon being
+    broken rather than as a reason to fit a Piston. Armour now floors at 25% of
+    the raw hit.
+20. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
     117 px/s from a 126 px/s robot — technically possible, practically not.
     Telegraph geometry is now derived from player speed.
-11. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
+21. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
     find. The gap now widens with the volley count.
-12. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
+22. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
     upgrades rather than on build quality. Reduced.
-13. **Scrap left on the floor was lost** when the wave timer expired. It is now
+23. **Scrap left on the floor was lost** when the wave timer expired. It is now
     swept into the total on a clear.
 
 ### Found by unit tests
 
-14. Nothing — the unit tests were written after the code and all passed on first
+24. Nothing — the unit tests were written after the code and all passed on first
     run, except one case where **the test was wrong** (it assumed the event
     emitter would store the same function reference twice; a `Set` deduplicates
     it). The behaviour is now pinned by a test that documents it.

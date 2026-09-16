@@ -65,8 +65,10 @@ ${frame(projPng, 20, 20, 2, 6, 3.2, 430, 292)}
 ${frame(projPng, 20, 20, 0, 6, 2.6, 404, 300)}
 
 <div style="position:absolute;left:44px;top:44px">
-  <div style="font-size:62px;letter-spacing:.08em;color:#ffd06a;line-height:1;
-    text-shadow:0 5px 0 #8f5220, 0 0 34px rgba(237,164,63,.45)">ИСКРОЛОМ</div>
+  <!-- The drop shadow is kept shorter than a stroke is thick. At 5px it
+       filled the opening in the С, and the title read as ИОКРОЛОМ. -->
+  <div style="font-size:62px;letter-spacing:.11em;color:#ffd06a;line-height:1;
+    text-shadow:0 3px 0 #3d2109, 0 0 34px rgba(237,164,63,.4)">ИСКРОЛОМ</div>
   <div style="font-size:21px;letter-spacing:.19em;color:#8fa2bf;margin-top:9px">SPARKSCRAPPER</div>
   <div style="font-size:19px;color:#dbe6f7;margin-top:18px;max-width:330px;line-height:1.4">
     Собери оборудование<br>на панели 2&times;3

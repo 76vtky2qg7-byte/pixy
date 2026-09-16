@@ -46,7 +46,7 @@ design costs zero bytes of download.
 
 ## Third-party assets
 
-### Pixelify Sans (font)
+### Pixelify Sans (font), modified
 
 The only third-party asset in the build.
 
@@ -59,11 +59,34 @@ The only third-party asset in the build.
 | **Licence text** | bundled verbatim at `public/fonts/OFL.txt` and shipped in the build at `fonts/OFL.txt` |
 | **Copyright** | Copyright 2021 The Pixelify Sans Project Authors |
 | **Files** | `public/fonts/pixelify-latin.woff2`, `public/fonts/pixelify-cyrillic.woff2` |
-| **Modifications** | None to the font data. Only the Latin and Cyrillic subsets published by Google Fonts are included; the Latin-Extended subset is omitted to save bandwidth. The files are self-hosted rather than loaded from a CDN. |
-| **Cyrillic support** | Yes — this is why it was chosen. Covers U+0400–U+045F, U+0490–0491, U+04B0–04B1, U+2116. |
+| **Reserved Font Name** | none declared in the upstream copyright notice |
+| **Internal family name** | changed to `Sparkscrapper Pixel`, so the modified files do not present themselves as the original release |
+| **Rebuilt by** | `tools/genfont.py` (needs `fonttools` and `brotli`, and network access to `fonts.gstatic.com`) |
+| **Cyrillic support** | complete for Russian after the fix below: U+0400–U+045F, U+0490–0491, U+04B0–04B1, U+2116, plus U+2192, U+2605, U+2714 |
 
-The OFL permits bundling and redistribution with software. The font is not sold
-separately, is not renamed, and its licence travels with it in the archive.
+**Modifications.** The released font has no glyph for U+041E (О) or U+041F (П).
+Both are common capitals in Russian, and without them a browser silently
+substitutes a system serif in the middle of a word. Five glyphs were added:
+
+| Added | How |
+|---|---|
+| U+041E `О` | the Latin `O` outline copied across with its weight-axis deltas — the two are the same shape in this design |
+| U+041F `П` | `п` raised from x-height to cap height; identical point structure, so its deltas carry over unchanged |
+| U+2192 `→` | drawn as a pixel bitmap on the font's own grid |
+| U+2605 `★` | drawn as a pixel bitmap on the font's own grid |
+| U+2714 `✔` | drawn as a pixel bitmap on the font's own grid |
+
+Also: only the Latin and Cyrillic subsets published by Google Fonts are
+included, the Latin-Extended subset is omitted to save bandwidth, and the files
+are self-hosted rather than loaded from a CDN. Both files keep the upstream
+`wght` 400–700 variable axis, and the added glyphs vary with it in step with
+the rest of the alphabet.
+
+The OFL permits modification and redistribution with software, and requires a
+derivative to stay under the same licence and to carry the notice — the licence
+text ships in the archive. No Reserved Font Name is declared upstream, but the
+internal family name was changed regardless so the modified files are not
+mistaken for the original. The font is not sold separately.
 
 ## Third-party code
 

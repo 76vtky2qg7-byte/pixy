@@ -6,6 +6,7 @@
  */
 export const RU = {
   // --- app ---
+  gameName: 'Искролом',
   gameTitle: 'ИСКРОЛОМ',
   gameSubtitle: 'ночная смена на перерабатывающем заводе',
   loading: 'Загрузка…',
@@ -267,6 +268,7 @@ export const RU = {
 export type StringKey = keyof typeof RU;
 
 export const EN: Record<StringKey, string> = {
+  gameName: 'Sparkscrapper',
   gameTitle: 'SPARKSCRAPPER',
   gameSubtitle: 'night shift at the reclamation plant',
   loading: 'Loading…',
@@ -520,9 +522,16 @@ const listeners = new Set<(lang: Lang) => void>();
 export const getLang = (): Lang => current;
 
 export function setLang(lang: Lang): void {
-  if (lang === current) return;
+  const changed = lang !== current;
   current = lang;
-  if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang;
+    // The tab title is the game's name in the player's own language, so it
+    // reads the same as the name on its store card. index.html ships the
+    // Russian name as the static default.
+    document.title = t('gameName');
+  }
+  if (!changed) return;
   for (const fn of listeners) fn(lang);
 }
 

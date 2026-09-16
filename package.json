@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "art": "node tools/genart.mjs",
+    "font": "python3 tools/genfont.py",
     "dev": "npm run art && vite",
     "build": "npm run art && tsc --noEmit && vite build",
     "preview": "vite preview --port 4173 --strictPort",
@@ -13,7 +14,10 @@
     "test:watch": "vitest",
     "pack:yandex": "node tools/pack.mjs",
     "release": "npm run build && npm run pack:yandex",
-    "verify": "node tools/verify.mjs"
+    "verify": "node tools/verify.mjs",
+    "audit:static": "node tools/audit-static.mjs",
+    "audit:browser": "node tools/audit-browser.mjs",
+    "audit:iframe": "node tools/audit-iframe.mjs"
   },
   "devDependencies": {
     "@types/ysdk": "1.2.0",

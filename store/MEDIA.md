@@ -11,29 +11,29 @@ game's own generated sprites and font — none are mock-ups.
 
 | File | Format | Width | Height | Size |
 |---|---|---|---|---|
-| `cover-1280x720.png` | PNG | 1280 | 720 | 484.6 KB |
-| `cover-800x470.png` | PNG | 800 | 470 | 220.1 KB |
+| `cover-1280x720.png` | PNG | 1280 | 720 | 481.8 KB |
+| `cover-800x470.png` | PNG | 800 | 470 | 217 KB |
 | `icon-512x512.png` | PNG | 512 | 512 | 8.4 KB |
-| `screenshots/1-menu-1366x768.png` | PNG | 1366 | 768 | 121.7 KB |
-| `screenshots/1-menu-360x800.png` | PNG | 720 | 1600 | 162.8 KB |
-| `screenshots/1-menu-390x844.png` | PNG | 1170 | 2532 | 284.3 KB |
-| `screenshots/2-combat-1366x768.png` | PNG | 1366 | 768 | 47.7 KB |
-| `screenshots/2-combat-360x800.png` | PNG | 720 | 1600 | 64.3 KB |
-| `screenshots/2-combat-390x844.png` | PNG | 1170 | 2532 | 85.7 KB |
-| `screenshots/3-panel-1366x768.png` | PNG | 1366 | 768 | 69.1 KB |
-| `screenshots/3-panel-360x800.png` | PNG | 720 | 1600 | 59.4 KB |
-| `screenshots/3-panel-390x844.png` | PNG | 1170 | 2532 | 90.8 KB |
-| `screenshots/4-boss-1366x768.png` | PNG | 1366 | 768 | 43.8 KB |
-| `screenshots/4-boss-360x800.png` | PNG | 720 | 1600 | 65.1 KB |
-| `screenshots/4-boss-390x844.png` | PNG | 1170 | 2532 | 94 KB |
-| `screenshots/5-workshop-1366x768.png` | PNG | 1366 | 768 | 58.2 KB |
-| `screenshots/5-workshop-360x800.png` | PNG | 720 | 1600 | 62.1 KB |
-| `screenshots/5-workshop-390x844.png` | PNG | 1170 | 2532 | 92.9 KB |
-| `screenshots/6-contracts-1366x768.png` | PNG | 1366 | 768 | 74.3 KB |
-| `screenshots/6-contracts-360x800.png` | PNG | 720 | 1600 | 82.9 KB |
-| `screenshots/6-contracts-390x844.png` | PNG | 1170 | 2532 | 120.3 KB |
+| `screenshots/1-menu-1366x768.png` | PNG | 1366 | 768 | 118.3 KB |
+| `screenshots/1-menu-360x800.png` | PNG | 720 | 1600 | 157.1 KB |
+| `screenshots/1-menu-390x844.png` | PNG | 1170 | 2532 | 276.3 KB |
+| `screenshots/2-combat-1366x768.png` | PNG | 1366 | 768 | 51.6 KB |
+| `screenshots/2-combat-360x800.png` | PNG | 720 | 1600 | 61.5 KB |
+| `screenshots/2-combat-390x844.png` | PNG | 1170 | 2532 | 89.1 KB |
+| `screenshots/3-panel-1366x768.png` | PNG | 1366 | 768 | 67.3 KB |
+| `screenshots/3-panel-360x800.png` | PNG | 720 | 1600 | 55 KB |
+| `screenshots/3-panel-390x844.png` | PNG | 1170 | 2532 | 85.4 KB |
+| `screenshots/4-boss-1366x768.png` | PNG | 1366 | 768 | 42 KB |
+| `screenshots/4-boss-360x800.png` | PNG | 720 | 1600 | 62.2 KB |
+| `screenshots/4-boss-390x844.png` | PNG | 1170 | 2532 | 92.9 KB |
+| `screenshots/5-workshop-1366x768.png` | PNG | 1366 | 768 | 57.5 KB |
+| `screenshots/5-workshop-360x800.png` | PNG | 720 | 1600 | 60 KB |
+| `screenshots/5-workshop-390x844.png` | PNG | 1170 | 2532 | 90.6 KB |
+| `screenshots/6-contracts-1366x768.png` | PNG | 1366 | 768 | 70.9 KB |
+| `screenshots/6-contracts-360x800.png` | PNG | 720 | 1600 | 76.6 KB |
+| `screenshots/6-contracts-390x844.png` | PNG | 1170 | 2532 | 109.1 KB |
 
-Total: 21 images, 2.34 MB.
+Total: 21 images, 2.28 MB.
 
 ## Video
 
@@ -47,8 +47,8 @@ change and the faster firing afterwards are the game doing its normal job.
 
 | File | Codec | Width | Height | Duration | Size |
 |---|---|---|---|---|---|
-| `video/gameplay-desktop-1366x768.webm` | vp8 | 1366 | 768 | 34.4s | 3738.5 KB |
-| `video/gameplay-portrait-390x844.webm` | vp8 | 390 | 844 | 34.4s | 3133.2 KB |
+| `video/gameplay-desktop-1366x768.webm` | vp8 | 1366 | 768 | 36.2s | 3894.1 KB |
+| `video/gameplay-portrait-390x844.webm` | vp8 | 390 | 844 | 36.2s | 3375.4 KB |
 
 Only **WebM/VP8** could be produced here: the ffmpeg bundled with the
 browser is a minimal build with no H.264 encoder, so there is no MP4. If the

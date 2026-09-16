@@ -27,7 +27,15 @@ npm run preview      # serve the production build on :4173
 npm test             # unit tests (129)
 npm run art          # regenerate every sprite from source code
 npm run release      # build + verify + write yandex-build.zip
+
+npm run audit:static # text, licence and store-card checks; no browser needed
 ```
+
+`npm run font` rebuilds the two bundled `.woff2` files from upstream Pixelify
+Sans, adding the glyphs it is missing (`О`, `П`, `→`, `✔`, `★` — see
+`ASSET_LICENSES.md`). It needs `pip install fonttools brotli` and network
+access, and the generated files are committed, so an ordinary build never runs
+it.
 
 Browser checks (Playwright is not a project dependency — it is a large tool and
 is installed separately):
@@ -43,6 +51,11 @@ cd -  && ln -sfn /tmp/pw/node_modules/playwright node_modules/playwright \
 
 node tools/e2e/run.mjs        # 66 end-to-end checks against the built game
 node tools/e2e/perf.mjs       # frame-rate measurement
+node tools/e2e/screenshots.mjs # recapture store/screenshots/ from the real game
+node tools/e2e/record-video.mjs # record store/video/ gameplay clips
+
+npm run audit:browser         # layout, fonts, dead buttons, console, egress
+npm run audit:iframe          # the game embedded cross-origin, incl. no storage
 node tools/store-art.mjs      # regenerate the store cover images
 node tools/media-manifest.mjs # re-measure store/MEDIA.md from the image files
 npx vite-node tools/sim/report.ts   # regenerate the tables in BALANCE.md
