@@ -1,13 +1,34 @@
 # Store media inventory
 
 Measured from the files themselves — dimensions come from each PNG header,
-sizes from the filesystem. Nothing here is asserted to match the Yandex
-draft form: **the required dimensions could not be read from this**
-**environment** (see TEST_REPORT.md), so check each field against the form
-when filling the draft and re-export only what actually mismatches.
+durations out of the video container, sizes from the filesystem.
 
 Every image is a real render of the built game or is composed from the
 game's own generated sprites and font — none are mock-ups.
+
+## What the platform actually requires
+
+The Yandex documentation pages are not reachable from the build
+environment, so this table separates what has been seen on the real
+console from what is still an assumption. Two of these were guessed wrong
+before the owner checked the form, which is why the distinction is drawn.
+
+| Requirement | Limit | How it is known |
+|---|---|---|
+| Icon | PNG 512x512 | printed beside the field on the console |
+| Video length | 28 seconds | reported by the owner from the console |
+| Название | 50 characters | counter on the console |
+| Описание для SEO | 160 characters | counter on the console |
+| Об игре | 1000 characters | counter on the console |
+| Короткое описание | 70 characters | counter on the console |
+| Как играть | 1000 characters | counter on the console |
+| Ключевые слова | 100 characters | counter on the console |
+| Cover dimensions | **unverified** | both 800x470 and 1280x720 are provided |
+| Screenshot dimensions and count | **unverified** | three sizes provided per language |
+| Archive size cap | **unverified** | the build is 1.4 MB unpacked, far below any plausible cap |
+
+Check anything marked unverified against the form and re-export only what
+actually mismatches.
 
 | File | Format | Width | Height | Size |
 |---|---|---|---|---|
@@ -65,17 +86,17 @@ change and the faster firing afterwards are the game doing its normal job.
 
 | File | Codec | Width | Height | Duration | Size |
 |---|---|---|---|---|---|
-| `video/gameplay-landscape-1366x768-en.webm` | vp8 | 1366 | 768 | 36s | 3814.6 KB |
-| `video/gameplay-landscape-1366x768-ru.webm` | vp8 | 1366 | 768 | 36.1s | 3892.5 KB |
-| `video/gameplay-portrait-390x844-en.webm` | vp8 | 390 | 844 | 35.8s | 3314.6 KB |
-| `video/gameplay-portrait-390x844-ru.webm` | vp8 | 390 | 844 | 35.9s | 3298.6 KB |
+| `video/gameplay-landscape-1366x768-en.webm` | vp8 | 1366 | 768 | 26.1s | 2967.9 KB |
+| `video/gameplay-landscape-1366x768-ru.webm` | vp8 | 1366 | 768 | 26.3s | 2896.1 KB |
+| `video/gameplay-portrait-390x844-en.webm` | vp8 | 390 | 844 | 26s | 2616.6 KB |
+| `video/gameplay-portrait-390x844-ru.webm` | vp8 | 390 | 844 | 26.8s | 2520.5 KB |
 
 Only **WebM/VP8** could be produced here: the ffmpeg bundled with the
 browser is a minimal build with no H.264 encoder, so there is no MP4. If the
 draft form requires MP4, convert with a full ffmpeg:
 
 ```bash
-ffmpeg -i gameplay-portrait-390x844.webm -c:v libx264 -crf 20 -pix_fmt yuv420p gameplay.mp4
+ffmpeg -i gameplay-landscape-1366x768-ru.webm -c:v libx264 -crf 20 -pix_fmt yuv420p gameplay.mp4
 ```
 
 Shot list and timings: `store/VIDEO_SCRIPT.md`.

@@ -16,6 +16,7 @@
  *
  * Follows store/VIDEO_SCRIPT.md.
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,30 @@ const OUT = path.join(ROOT, 'store', 'video');
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:4173';
 const CHROME = process.env.E2E_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const RAW = '/tmp/video-raw';
+const FFMPEG = process.env.E2E_FFMPEG || '/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux';
+
+/**
+ * Yandex Games caps a store video at 28 seconds. The pacing below is set to
+ * land under it, but pacing drifts whenever the script changes, so the real
+ * duration is read back from every file and the run fails if one is over.
+ */
+const MAX_SECONDS = 28;
+
+/** Duration in seconds, read out of the container rather than assumed. */
+function durationOf(file) {
+  let text;
+  try {
+    text = execFileSync(FFMPEG, ['-hide_banner', '-i', file],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    // ffmpeg exits non-zero when given no output file; its report is on stderr.
+    text = String(err.stderr ?? '');
+  }
+  const m = /Duration:\s*(\d+):(\d+):(\d+\.\d+)/.exec(text);
+  return m ? +(+m[1] * 3600 + +m[2] * 60 + +m[3]).toFixed(2) : 0;
+}
+
+const tooLong = [];
 
 fs.rmSync(RAW, { recursive: true, force: true });
 fs.mkdirSync(RAW, { recursive: true });
@@ -180,13 +205,13 @@ for (const layout of LAYOUTS) {
     });
     window.__app.show('menu');
   });
-  await wait(1300);
+  await wait(700);
 
-  /* ---- 0:00 menu -> contract ---- */
-  await tap(T.play, 650);
+  /* ---- menu -> contract ---- */
+  await tap(T.play, 400);
   await page.locator('#ui-root .card', { hasText: T.contract }).first().click();
-  await wait(850);
-  await tap(T.accept, 600);
+  await wait(500);
+  await tap(T.accept, 400);
 
   /* ---- stage a dense mid-contract wave with a single weapon ---- */
   await page.evaluate(() => {
@@ -198,15 +223,15 @@ for (const layout of LAYOUTS) {
     r.slots = ['riveter', null, 'buzzsaw', null, null, null];
     window.__app.show('prep');
   });
-  await wait(800);
-  await tap(T.startWave, 350);
+  await wait(500);
+  await tap(T.startWave, 300);
 
-  /* ---- 0:04 combat ---- */
+  /* ---- combat ---- */
   await page.evaluate(autopilot(layout.stick.x, layout.stick.y));
   await page.evaluate(() => window.__auto.start());
-  await wait(6500);
+  await wait(4300);
 
-  /* ---- 0:11 end the wave on cue ---- */
+  /* ---- end the wave on cue ---- */
   await page.evaluate(() => window.__auto.stop());
   await page.evaluate(() => {
     const w = window.__app.world;
@@ -214,9 +239,9 @@ for (const layout of LAYOUTS) {
     for (const e of w.enemies.items) if (e.active) w.enemies.release(e);
   });
   await page.waitForFunction(() => window.__app.screen === 'prep', null, { timeout: 15000 });
-  await wait(900);
+  await wait(600);
 
-  /* ---- 0:12 the shop: put a Battery beside the Riveter ---- */
+  /* ---- the shop: put a Battery beside the Riveter ---- */
   await page.evaluate(() => {
     const r = window.__app.run;
     // Seed the offer, the way a trailer stages a shot. The purchase, the
@@ -228,24 +253,24 @@ for (const layout of LAYOUTS) {
     r.scrap = 96;
     window.__app.show('prep');
   });
-  await wait(1000);
+  await wait(700);
   await page.locator('#ui-root button', { hasText: T.buy }).first().click();
-  await wait(1500);
+  await wait(1000);
 
-  /* ---- 0:15 the whole point: tap the Battery and read what it is doing.
+  /* ---- the whole point: tap the Battery and read what it is doing.
          The explanation renders directly under the panel, so the link and the
          numbers are on screen together and nothing has to scroll. ---- */
   await page.locator('#ui-root .cell').nth(1).click();
-  await wait(3000);
+  await wait(2400);
   await page.locator('#ui-root .cell').nth(1).click();
-  await wait(500);
+  await wait(350);
 
-  /* ---- 0:19 next wave, visibly faster ---- */
-  await tap(T.startWave, 350);
+  /* ---- next wave, visibly faster ---- */
+  await tap(T.startWave, 300);
   await page.evaluate(() => window.__auto.start());
-  await wait(5800);
+  await wait(3900);
 
-  /* ---- 0:25 boss ---- */
+  /* ---- boss ---- */
   await page.evaluate(() => window.__auto.stop());
   await page.evaluate(() => {
     const a = window.__app;
@@ -256,11 +281,11 @@ for (const layout of LAYOUTS) {
     const b = a.world.boss;
     if (b) { b.x = a.world.px + 40; b.y = a.world.py - 150; }
   });
-  await wait(800);
+  await wait(600);
   await page.evaluate(() => window.__auto.start());
-  await wait(5600);
+  await wait(3900);
   await page.evaluate(() => window.__auto.stop());
-  await wait(500);
+  await wait(300);
 
   const video = page.video();
   await ctx.close();
@@ -269,9 +294,18 @@ for (const layout of LAYOUTS) {
   const dest = path.join(OUT, `gameplay-${layout.name}.webm`);
   fs.copyFileSync(raw, dest);
   const kb = (fs.statSync(dest).size / 1024).toFixed(0);
-  console.log(`store/video/gameplay-${layout.name}.webm  ${kb} KB  ${layout.viewport.width}x${layout.viewport.height}  ${layout.lang}`);
+  const seconds = durationOf(dest);
+  if (seconds > MAX_SECONDS) tooLong.push(`${layout.name} is ${seconds}s`);
+  console.log(`store/video/gameplay-${layout.name}.webm  ${kb} KB  ${layout.viewport.width}x${layout.viewport.height}  ${layout.lang}  ${seconds}s`);
   if (errors.length) console.log('  page errors:', errors);
   else console.log('  no page errors during recording');
 }
 
 await browser.close();
+
+if (tooLong.length) {
+  console.error(`\nOver the ${MAX_SECONDS}s store limit: ${tooLong.join(', ')}`);
+  console.error('Shorten the waits in this script and record again.');
+  process.exit(1);
+}
+console.log(`\nevery clip is within the ${MAX_SECONDS}s store limit`);

@@ -452,6 +452,28 @@ comparing advance widths, which agree by coincidence often enough to produce
 both false alarms and false silence. It now renders each character to a canvas
 twice and compares pixels.
 
+### Found by the owner, against the real console
+
+Twice now a platform limit turned out to be tighter than what was assumed
+here, because the Yandex documentation pages are unreachable from this
+environment and nothing local could contradict a guess.
+
+- **Description fields.** The console caps Название at 50, Описание для SEO at
+  160, Об игре at 1000, Короткое описание at 70 and Как играть at 1000 — and
+  has an SEO field that had no counterpart here at all. Об игре was about 1600
+  characters and the short descriptions were 71 and 74, so three fields could
+  not have been submitted. Every text is rewritten to fit, and the limits now
+  live in `audit:static`, which also checks the counter printed beside each
+  field against the length of the text under it.
+- **Video length.** The store caps a clip at 28 seconds; the recordings were
+  36. The script is re-paced to land at 26, and `record-video.mjs` now reads
+  the duration back out of each finished file and fails the run if one is
+  over, so re-pacing cannot quietly push it past the limit again.
+
+`store/MEDIA.md` now separates requirements seen on the real console from the
+ones still assumed — cover dimensions, screenshot sizes and the archive cap
+are marked unverified rather than stated.
+
 ### Found by end-to-end checks
 
 9. **Two screens could be live at once.** Screens are code-split, so `show()`
