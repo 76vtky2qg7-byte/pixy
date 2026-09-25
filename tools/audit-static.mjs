@@ -270,8 +270,10 @@ for (const f of [
   'TEST_REPORT.md', 'ASSET_LICENSES.md', 'store/MEDIA.md',
   'store/OWNER_CHECKLIST.md', 'store/VIDEO_SCRIPT.md',
   'store/card-draft.md', 'store/iskrolom-store-card.docx',
-  'store/icon-512x512.png', 'store/cover-800x470.png',
-  'store/cover-1280x720.png',
+  'store/icon-512x512.png',
+  // The cover carries the game's name, so it exists per language.
+  'store/cover-800x470-ru.png', 'store/cover-800x470-en.png',
+  'store/cover-1280x720-ru.png', 'store/cover-1280x720-en.png',
   // Both orientations in both languages: the store card asks for landscape,
   // and moderation checks every language the game claims to support.
   'store/video/gameplay-portrait-390x844-ru.webm',

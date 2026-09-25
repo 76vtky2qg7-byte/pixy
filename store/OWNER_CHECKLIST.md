@@ -27,8 +27,9 @@
 - [ ] **Описание и продвижение** — вкладки «Русский» и «Английский».
       Значения: `store/card-ru.md` и `store/card-en.md`. Все поля уложены в
       лимиты формы (50 / 160 / 1000 / 70 / 1000), счётчики проставлены.
-- [ ] Иконка `store/icon-512x512.png`, обложка `store/cover-800x470.png` или
-      `store/cover-1280x720.png`, скриншоты из `store/screenshots/ru/` и
+- [ ] Иконка `store/icon-512x512.png`, обложка `store/cover-800x470-ru.png`
+      (или `-en.png` на английской вкладке; есть и вариант 1280x720),
+      скриншоты из `store/screenshots/ru/` и
       `store/screenshots/en/`, видео из `store/video/`.
 
 ## 2. Инициализация SDK

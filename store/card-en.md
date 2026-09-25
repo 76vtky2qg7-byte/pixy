@@ -75,7 +75,9 @@ Desktop: WASD or arrow keys. Keys are read by physical position, so any keyboard
 The form asks for a **PNG 512×512** icon. The ready file is
 `store/icon-512x512.png`, exactly that size.
 
-Covers: `store/cover-800x470.png` and `store/cover-1280x720.png`. Which one the
+Covers come one per language, since the artwork carries the name:
+`store/cover-800x470-ru.png` and `store/cover-800x470-en.png`, plus the same
+artwork wider at `store/cover-1280x720-ru.png` and `-en.png`. Which size the
 form wants is visible on the spot; both are ready.
 
 Screenshots are in `store/screenshots/ru/` and `store/screenshots/en/` — six

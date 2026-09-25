@@ -25,8 +25,10 @@ const copy = (from, to) => fs.cpSync(path.join(ROOT, from), path.join(STAGE, to)
 
 copy('yandex-build.zip', 'upload/yandex-build.zip');
 copy('store/icon-512x512.png', 'upload/icon-512x512.png');
-copy('store/cover-800x470.png', 'upload/cover-800x470.png');
-copy('store/cover-1280x720.png', 'upload/cover-1280x720.png');
+for (const lang of ['ru', 'en']) {
+  copy(`store/cover-800x470-${lang}.png`, `upload/cover-800x470-${lang}.png`);
+  copy(`store/cover-1280x720-${lang}.png`, `upload/cover-1280x720-${lang}.png`);
+}
 copy('store/screenshots', 'upload/screenshots');  // ru/ and en/
 copy('store/video', 'upload/video');
 copy('store/iskrolom-store-card.docx', 'iskrolom-store-card.docx');
@@ -43,8 +45,9 @@ fs.writeFileSync(path.join(STAGE, 'ЧИТАТЬ ПЕРВЫМ.txt'), [
   '',
   '  yandex-build.zip        сам билд. Грузится целиком, распаковывать не нужно.',
   '  icon-512x512.png        иконка, PNG 512×512 — как просит форма',
-  '  cover-800x470.png       обложка',
-  '  cover-1280x720.png      обложка побольше, если форма попросит такую',
+  '  cover-800x470-ru.png    обложка, русская',
+  '  cover-800x470-en.png    она же на английском',
+  '  cover-1280x720-*.png    то же самое пошире, если форма попросит такую',
   '  screenshots/ru/         18 штук: 6 экранов в трёх размерах',
   '  screenshots/en/         то же самое на английском',
   '  video/                  четыре ролика по 26 с: вертикальный и горизонтальный,',

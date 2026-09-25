@@ -32,8 +32,10 @@ actually mismatches.
 
 | File | Format | Width | Height | Size |
 |---|---|---|---|---|
-| `cover-1280x720.png` | PNG | 1280 | 720 | 481.8 KB |
-| `cover-800x470.png` | PNG | 800 | 470 | 217 KB |
+| `cover-1280x720-en.png` | PNG | 1280 | 720 | 480.8 KB |
+| `cover-1280x720-ru.png` | PNG | 1280 | 720 | 481.8 KB |
+| `cover-800x470-en.png` | PNG | 800 | 470 | 216.4 KB |
+| `cover-800x470-ru.png` | PNG | 800 | 470 | 217 KB |
 | `icon-512x512.png` | PNG | 512 | 512 | 8.4 KB |
 | `screenshots/en/1-menu-1366x768.png` | PNG | 1366 | 768 | 128.2 KB |
 | `screenshots/en/1-menu-360x800.png` | PNG | 720 | 1600 | 163.1 KB |
@@ -72,7 +74,7 @@ actually mismatches.
 | `screenshots/ru/6-contracts-360x800.png` | PNG | 720 | 1600 | 76.6 KB |
 | `screenshots/ru/6-contracts-390x844.png` | PNG | 1170 | 2532 | 109.1 KB |
 
-Total: 39 images, 3.84 MB.
+Total: 41 images, 4.52 MB.
 
 ## Video
 
@@ -106,8 +108,8 @@ Shot list and timings: `store/VIDEO_SCRIPT.md`.
 | File | Purpose |
 |---|---|
 | `icon-512x512.png` | Game icon. Composed scene: the salvage robot mid-fight. |
-| `cover-800x470.png` | Catalogue cover with the title and the 2x3 panel. |
-| `cover-1280x720.png` | Same artwork at 16:9, if a wider banner is wanted. |
+| `cover-800x470-*.png` | Catalogue cover with the title and the 2x3 panel, one per language. |
+| `cover-1280x720-*.png` | Same artwork at 16:9, if a wider banner is wanted. |
 | `screenshots/*/1-menu-*` | Main menu. |
 | `screenshots/*/2-combat-*` | Combat on the foundry floor, full six-cell panel. |
 | `screenshots/*/3-panel-*` | The equipment panel with live adjacency links, plus stores. |

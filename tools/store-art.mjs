@@ -47,7 +47,32 @@ const frame = (src, fw, fh, index, cols, scale, x, y, extra = '') => {
     background-position:${-col * fw * scale}px ${-row * fh * scale}px;${extra}"></div>`;
 };
 
-const coverBody = `<body>
+/**
+ * The words on the cover, per language.
+ *
+ * The big line is the name in that language; the small line under it is the
+ * other name, so a player who knows the game by either one recognises it.
+ * The English title is thirteen characters against eight, so it gets a
+ * smaller size to keep clear of the panel on the right.
+ */
+const COVER_TEXT = {
+  ru: {
+    title: 'ИСКРОЛОМ', titleSize: 62,
+    alt: 'SPARKSCRAPPER',
+    pitch: 'Собери оборудование<br>на панели 2&times;3',
+    caption: 'Батарея ускоряет соседнее оружие',
+  },
+  en: {
+    title: 'SPARKSCRAPPER', titleSize: 44,
+    alt: 'ИСКРОЛОМ',
+    pitch: 'Build your loadout<br>on a 2&times;3 panel',
+    caption: 'A Battery speeds up the weapon beside it',
+  },
+};
+
+const cover = (lang) => {
+  const t = COVER_TEXT[lang];
+  return `<body>
 <div style="position:absolute;inset:0;background-image:url(${tile});background-size:256px 256px;
   background-position:0 0;opacity:.9;image-rendering:pixelated"></div>
 <div style="position:absolute;inset:0;background:
@@ -67,11 +92,11 @@ ${frame(projPng, 20, 20, 0, 6, 2.6, 404, 300)}
 <div style="position:absolute;left:44px;top:44px">
   <!-- The drop shadow is kept shorter than a stroke is thick. At 5px it
        filled the opening in the С, and the title read as ИОКРОЛОМ. -->
-  <div style="font-size:62px;letter-spacing:.11em;color:#ffd06a;line-height:1;
-    text-shadow:0 3px 0 #3d2109, 0 0 34px rgba(237,164,63,.4)">ИСКРОЛОМ</div>
-  <div style="font-size:21px;letter-spacing:.19em;color:#8fa2bf;margin-top:9px">SPARKSCRAPPER</div>
+  <div style="font-size:${t.titleSize}px;letter-spacing:.11em;color:#ffd06a;line-height:1;
+    text-shadow:0 3px 0 #3d2109, 0 0 34px rgba(237,164,63,.4)">${t.title}</div>
+  <div style="font-size:21px;letter-spacing:.19em;color:#8fa2bf;margin-top:9px">${t.alt}</div>
   <div style="font-size:19px;color:#dbe6f7;margin-top:18px;max-width:330px;line-height:1.4">
-    Собери оборудование<br>на панели 2&times;3
+    ${t.pitch}
   </div>
 </div>
 
@@ -90,9 +115,10 @@ ${frame(projPng, 20, 20, 0, 6, 2.6, 404, 300)}
 <div style="position:absolute;right:100px;top:130px;width:9px;height:7px;
   background:#59d98d;border-radius:2px;box-shadow:0 0 10px rgba(89,217,141,.9)"></div>
 <div style="position:absolute;right:40px;bottom:34px;font-size:15px;color:#59d98d;letter-spacing:.04em">
-  Батарея ускоряет соседнее оружие
+  ${t.caption}
 </div>
 </body>`;
+};
 
 /* ---------------- icon 512x512 (already generated as art) ---------------- */
 
@@ -109,9 +135,13 @@ async function shoot(name, w, h, body) {
   console.log(`store/${name}  ${w}x${h}`);
 }
 
-await shoot('cover-800x470.png', 800, 470, coverBody);
-// A 16:9 variant, for wherever a wide banner is wanted.
-await shoot('cover-1280x720.png', 1280, 720, coverBody.replace('left:44px;top:44px', 'left:70px;top:110px'));
+for (const lang of ['ru', 'en']) {
+  const body = cover(lang);
+  await shoot(`cover-800x470-${lang}.png`, 800, 470, body);
+  // A 16:9 variant, for wherever a wide banner is wanted.
+  await shoot(`cover-1280x720-${lang}.png`, 1280, 720,
+    body.replace('left:44px;top:44px', 'left:70px;top:110px'));
+}
 
 fs.copyFileSync(path.join(ROOT, 'src/assets/store_icon.png'), path.join(OUT, 'icon-512x512.png'));
 console.log('store/icon-512x512.png  512x512');

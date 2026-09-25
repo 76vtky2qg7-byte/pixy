@@ -77,7 +77,8 @@ manages its own browsers.
 3. Fill the store card from `store/card-ru.md` and `store/card-en.md`.
    Work through `store/OWNER_CHECKLIST.md` — it is the ordered list of
    everything that needs a real draft, starting with SDK initialisation.
-4. Upload `store/icon-512x512.png` and `store/cover-800x470.png`, plus the
+4. Upload `store/icon-512x512.png` and `store/cover-800x470-ru.png` (the
+   cover exists per language, since it carries the name), plus the
    screenshots in `store/screenshots/`.
    **Check the current required image sizes in the console before uploading** —
    see the note on unverified requirements below.
