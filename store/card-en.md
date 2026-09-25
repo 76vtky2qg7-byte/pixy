@@ -81,6 +81,10 @@ form wants is visible on the spot; both are ready.
 Screenshots are in `store/screenshots/ru/` and `store/screenshots/en/` — six
 screens at three sizes: 390×844 and 360×800 portrait, 1366×768 landscape.
 
+Video is in `store/video/`: four clips of 34 seconds, portrait and landscape,
+each in Russian and English. WebM; the MP4 conversion command is in
+`store/MEDIA.md`.
+
 ## Categories and tags
 
 These live in a different section of the console, not under the description.

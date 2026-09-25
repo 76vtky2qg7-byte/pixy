@@ -22,7 +22,9 @@ export function mountMenu(ctx: AppContext): () => void {
     el('div', {
       class: 'boot-logo',
       text: t('gameTitle'),
-      style: 'font-size:clamp(30px,10vw,58px)',
+      // The English title is 13 characters against the Russian 8, so the
+      // narrowest phone sets the ceiling here, not the longest screen.
+      style: 'font-size:clamp(28px,9vw,58px)',
     }),
     el('div', { class: 'muted', text: t('gameSubtitle'), style: 'margin-top:2px' }),
   );

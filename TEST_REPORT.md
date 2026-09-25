@@ -264,14 +264,15 @@ tablet portrait, in both languages, across six screens.
 
 | Check | Result |
 |---|---|
-| Text that overflows its box, is clipped, or runs off screen | pass — 120 screen/size/language combinations |
+| Text that overflows its box, is clipped, or runs off screen | pass — 120 screen/size/language combinations, both languages genuinely rendered |
 | Every character renders in the bundled pixel font | pass — compared by rendering to canvas and diffing pixels, not by advance width |
 | Buttons that do nothing when pressed | pass — 25 buttons exercised; radio options already selected are excluded, since those are meant to be inert |
 | Console errors and uncaught exceptions | pass |
 | Requests that leave the origin | pass — none |
 | The game still reaches a screen with no SDK, and reports its platform as `none` | pass |
 
-This is the run that found the missing `О` and `П`.
+This is the run that found the missing `О` and `П`, and — once its English
+runs were actually in English — the menu title overflowing a 320px phone.
 
 ### `npm run audit:iframe` — no findings
 
@@ -419,7 +420,15 @@ Ordered by how they were caught.
    audit and the media tooling drive the language through the browser locale
    the way a real player's browser does.
 
-7. **The page title read `Искролом / Sparkscrapper`.** One title carrying two
+7. **The English menu title overflowed the narrowest phone.**
+   `SPARKSCRAPPER` is thirteen characters where `ИСКРОЛОМ` is eight, so at
+   320×568 the title ran 3px past the screen. It had been invisible for as
+   long as the "English" audit runs were quietly rendering Russian. The menu
+   now sizes the title for the longer of the two names, and `.boot-logo`
+   takes back the letter-space that trails the final glyph — which had been
+   pushing a centred title off-centre at every width, not just this one.
+
+8. **The page title read `Искролом / Sparkscrapper`.** One title carrying two
    names with a slash reads as two games. It now follows the interface
    language — `Искролом` or `Sparkscrapper`, matching the name on each store
    card and on the menu screen — with the Russian name as the static default in
@@ -445,29 +454,29 @@ twice and compares pixels.
 
 ### Found by end-to-end checks
 
-8. **Two screens could be live at once.** Screens are code-split, so `show()`
+9. **Two screens could be live at once.** Screens are code-split, so `show()`
    mounts asynchronously; two calls in quick succession both appended their
    screen, because the second one's `clear()` ran before the first one's
    `import()` resolved. Mounts now carry a token and a superseded mount tears
    itself down. This is exactly the class of bug the 20-transition check exists
    to catch.
-9. **The tutorial silently died after the first screen change.** A screen change
+10. **The tutorial silently died after the first screen change.** A screen change
    clears `#ui-root`, detaching an open coach mark; the tutorial still believed
    a step was on screen and refused every later hint for the rest of the
    session. Added a screen-change hook, and a scrim so a pausing hint actually
    blocks what is under it (previously the player could start the wave out from
    under the hint, stranding a pause reason).
-10. **Losing wave one paid zero credits**, so the "double your credits" button
+11. **Losing wave one paid zero credits**, so the "double your credits" button
    offered to double nothing. Kills now pay, with a floor for any finished
    attempt, and the ad prompt is hidden entirely when there is nothing to
    double.
-11. **An SDK that never called back froze the game for 45 seconds.** The pause is
+12. **An SDK that never called back froze the game for 45 seconds.** The pause is
     now taken when the ad *opens*, not when it is *requested*, and a 6-second
     watchdog gives up if it never opens.
 
 ### Found while building the video, and worth fixing regardless
 
-12. **Tapping a filled cell explained the wrong thing.** Selecting a cell
+13. **Tapping a filled cell explained the wrong thing.** Selecting a cell
     previewed replacing it *with itself*, which produces an empty diff and
     rendered as "not connected to a weapon" — actively misleading for a module
     that was working perfectly. A tap now previews *removing* the part, which
@@ -476,19 +485,19 @@ twice and compares pixels.
     rate +25% → —". An empty diff also now distinguishes "this module touches
     no weapon" from "this changes nothing".
 
-13. **Hovering a shop card silently overrode an explicit cell selection**, so
+14. **Hovering a shop card silently overrode an explicit cell selection**, so
     the explanation panel described a part the player had not asked about. An
     explicit tap now outranks a passive hover, and moving off a card restores
     whatever the selection was showing.
 
-14. **The explanation sat below the shop**, so reading it scrolled the panel off
+15. **The explanation sat below the shop**, so reading it scrolled the panel off
     screen — and on the way, a shop card slid under the cursor and replaced the
     diff. It now renders directly under the panel, so the link and the numbers
     are visible together without scrolling.
 
 ### Found by external code review, then fixed and tested here
 
-15. **The SDK was loaded from the wrong URL.** The adapter used
+16. **The SDK was loaded from the wrong URL.** The adapter used
     `https://yandex.ru/games/sdk/v2`. A build served by Yandex from a ZIP
     exposes the SDK at the root path **`/sdk.js`**. This would have failed at
     the first hurdle in a real draft, and no amount of local testing would have
@@ -496,17 +505,17 @@ twice and compares pixels.
     `/sdk.js`, with the self-hosted form exported alongside it, and the packer
     asserts the built bundle actually references it.
 
-16. **The pause could be released while an ad was still on screen.** A 45-second
+17. **The pause could be released while an ad was still on screen.** A 45-second
     watchdog resolved the promise, and the caller cleared the `ad` pause in a
     `finally`. Any rewarded video longer than 45 seconds would have resumed the
     game — sound, simulation and all — underneath the ad.
 
-17. **A late `onOpen` could freeze the game permanently.** After the 6-second
+18. **A late `onOpen` could freeze the game permanently.** After the 6-second
     open timeout the promise resolved and the caller cleared the `ad` pause. If
     the host then opened the ad, `onOpen` set the pause again with nothing left
     to clear it. The game would sit paused forever.
 
-18. **A finished request released the in-flight guard while its ad was still
+19. **A finished request released the in-flight guard while its ad was still
     up**, so a second tap could stack a second ad; and a stale request's late
     callbacks could resolve a newer request.
 
@@ -518,28 +527,28 @@ twice and compares pixels.
     as a real recovery signal when `onClose` is lost, with a long backstop only
     for a host that provides neither.
 
-19. **The game did not work offline, while the store card said it did.** See the
+20. **The game did not work offline, while the store card said it did.** See the
     offline section above.
 
 ### Found by the balance harness
 
-20. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
+21. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
     the Cutter Beam's 2.6-damage tick into 1, which reads as the weapon being
     broken rather than as a reason to fit a Piston. Armour now floors at 25% of
     the raw hit.
-21. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
+22. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
     117 px/s from a 126 px/s robot — technically possible, practically not.
     Telegraph geometry is now derived from player speed.
-22. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
+23. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
     find. The gap now widens with the volley count.
-23. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
+24. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
     upgrades rather than on build quality. Reduced.
-24. **Scrap left on the floor was lost** when the wave timer expired. It is now
+25. **Scrap left on the floor was lost** when the wave timer expired. It is now
     swept into the total on a clear.
 
 ### Found by unit tests
 
-25. Nothing — the unit tests were written after the code and all passed on first
+26. Nothing — the unit tests were written after the code and all passed on first
     run, except one case where **the test was wrong** (it assumed the event
     emitter would store the same function reference twice; a `Set` deduplicates
     it). The behaviour is now pinned by a test that documents it.

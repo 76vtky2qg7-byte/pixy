@@ -91,6 +91,9 @@ html, body {
 .boot-logo {
   font-size: clamp(26px, 8vw, 52px); letter-spacing: .14em; color: var(--amber);
   text-shadow: 0 3px 0 var(--copper), 0 0 24px rgba(237,164,63,.35);
+  /* letter-spacing also trails the last glyph, which pushes a centred title
+     off-centre and past its box. Take that one gap back. */
+  margin-right: -.14em;
 }
 .boot-bar {
   width: min(260px, 62vw); height: 10px; background: var(--panel);
