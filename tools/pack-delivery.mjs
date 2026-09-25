@@ -27,24 +27,28 @@ copy('yandex-build.zip', 'upload/yandex-build.zip');
 copy('store/icon-512x512.png', 'upload/icon-512x512.png');
 copy('store/cover-800x470.png', 'upload/cover-800x470.png');
 copy('store/cover-1280x720.png', 'upload/cover-1280x720.png');
-copy('store/screenshots', 'upload/screenshots');
+copy('store/screenshots', 'upload/screenshots');  // ru/ and en/
 copy('store/video', 'upload/video');
 copy('store/iskrolom-store-card.docx', 'iskrolom-store-card.docx');
 
 fs.writeFileSync(path.join(STAGE, 'ЧИТАТЬ ПЕРВЫМ.txt'), [
   'Искролом / Sparkscrapper — что загружать в Яндекс Игры',
   '',
-  'Откройте iskrolom-store-card.docx — там все тексты карточки на русском',
-  'и английском. Серые блоки в нём вставляются в поля формы как есть.',
+  'Откройте iskrolom-store-card.docx — там всё по порядку: сначала страница',
+  '«Черновик» (версия, платформы, языки, категории, комментарий модератору),',
+  'потом «Описание и продвижение» на русском и английском. Серые блоки',
+  'вставляются в поля формы как есть.',
   '',
   'Папка upload:',
   '',
   '  yandex-build.zip        сам билд. Грузится целиком, распаковывать не нужно.',
-  '  icon-512x512.png        иконка',
+  '  icon-512x512.png        иконка, PNG 512×512 — как просит форма',
   '  cover-800x470.png       обложка',
   '  cover-1280x720.png      обложка побольше, если форма попросит такую',
-  '  screenshots/            18 штук: 6 экранов в трёх размерах',
-  '  video/                  два ролика по 34 секунды, WebM',
+  '  screenshots/ru/         18 штук: 6 экранов в трёх размерах',
+  '  screenshots/en/         то же самое на английском',
+  '  video/                  четыре ролика по 34 с: вертикальный и горизонтальный,',
+  '                          каждый на русском и английском. WebM.',
   '',
   'Название в каталоге на занятость я проверить не мог — каталог из среды',
   'сборки недоступен. Проверьте вручную, когда будете создавать черновик.',

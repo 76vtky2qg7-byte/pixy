@@ -207,25 +207,54 @@ for (const [file, lang] of [['store/card-ru.md', 'ru'], ['store/card-en.md', 'en
   // Each field's literal value is the body of the fenced block that follows
   // its heading, so the check reads exactly what gets pasted into the form.
   const field = (heading) => {
-    const m = new RegExp(`##\\s*${heading}[^\\n]*\\n+\`\`\`\\n([\\s\\S]*?)\\n\`\`\``).exec(text);
+    const m = new RegExp(`##\\s*${heading}[^\\n]*\\n+(?:\`[^\`]*\`[^\\n]*\\n+)?\`\`\`\\n([\\s\\S]*?)\\n\`\`\``).exec(text);
     return m ? m[1] : null;
   };
-  const short = field('Короткое описание') ?? field('Short description');
-  if (short === null) fail('store', `${file} has no short description field`);
-  else if (short.trim().length > 100) {
-    fail('store', `${file} short description is ${short.trim().length} chars, over 100`);
+
+  // Limits read off the real console form, not guessed. Overrunning any of
+  // them means the text cannot be submitted at all.
+  const FIELDS = [
+    ['Название', 'Title', 50, true],
+    ['Описание для SEO', 'SEO description', 160, false],
+    ['Об игре', 'About the game', 1000, true],
+    ['Короткое описание', 'Short description', 70, false],
+    ['Как играть', 'How to play', 1000, true],
+  ];
+  for (const [ru, en, limit, required] of FIELDS) {
+    const raw = field(ru) ?? field(en);
+    if (raw === null) {
+      fail('store', `${file} has no "${ru}" field`);
+      continue;
+    }
+    const v = raw.trim();
+    if (required && !v) fail('store', `${file}: "${ru}" is required and empty`);
+    if (v.length > limit) {
+      fail('store', `${file}: "${ru}" is ${v.length} characters, over the form's ${limit}`);
+    }
+    // The stated count next to the heading has to match the text under it,
+    // or the document lies about whether it fits.
+    const stated = new RegExp(`##\\s*(?:${ru}|${en})[^\\n]*\\n+\`(\\d+) / (\\d+)\``).exec(text);
+    if (stated) {
+      if (Number(stated[1]) !== v.length) {
+        fail('store', `${file}: "${ru}" is labelled ${stated[1]} characters but is ${v.length}`);
+      }
+      if (Number(stated[2]) !== limit) {
+        fail('store', `${file}: "${ru}" is labelled out of ${stated[2]} but the form allows ${limit}`);
+      }
+    }
   }
+
   const title = field('Название') ?? field('Title');
-  if (title === null) fail('store', `${file} has no title field`);
-  else {
+  if (title) {
     const value = title.trim();
-    if (!value || value.includes('\n')) fail('store', `${file} title is not a single line`);
     // A title carrying a slash, an emoji or a bracketed aside reads as two
     // names at once, which is the sort of thing moderation sends back.
+    if (value.includes('\n')) fail('store', `${file} title is not a single line`);
     if (/[\/|]|\p{Extended_Pictographic}/u.test(value)) {
       fail('store', `${file} title contains a separator or emoji: ${value}`);
     }
   }
+
   // Claims that are not verified must not appear.
   if (/без интернета|works offline\b/i.test(text) && !/после загрузки|once (the page has )?loaded/i.test(text)) {
     fail('store', `${file} claims offline support without scoping it`);
@@ -240,10 +269,33 @@ for (const f of [
   'yandex-build.zip', 'README.md', 'PROJECT_STATE.md', 'BALANCE.md',
   'TEST_REPORT.md', 'ASSET_LICENSES.md', 'store/MEDIA.md',
   'store/OWNER_CHECKLIST.md', 'store/VIDEO_SCRIPT.md',
+  'store/card-draft.md', 'store/iskrolom-store-card.docx',
   'store/icon-512x512.png', 'store/cover-800x470.png',
-  'store/video/gameplay-portrait-390x844.webm',
+  'store/cover-1280x720.png',
+  // Both orientations in both languages: the store card asks for landscape,
+  // and moderation checks every language the game claims to support.
+  'store/video/gameplay-portrait-390x844-ru.webm',
+  'store/video/gameplay-portrait-390x844-en.webm',
+  'store/video/gameplay-landscape-1366x768-ru.webm',
+  'store/video/gameplay-landscape-1366x768-en.webm',
 ]) {
   if (!fs.existsSync(path.join(ROOT, f))) fail('deliverables', `${f} is missing`);
+}
+
+// Screenshots: six screens at three sizes, in both languages.
+const SHOT_SCREENS = ['1-menu', '2-combat', '3-panel', '4-boss', '5-workshop', '6-contracts'];
+const SHOT_SIZES = ['390x844', '360x800', '1366x768'];
+for (const lang of ['ru', 'en']) {
+  const missing = [];
+  for (const screen of SHOT_SCREENS) {
+    for (const size of SHOT_SIZES) {
+      const rel = `store/screenshots/${lang}/${screen}-${size}.png`;
+      if (!fs.existsSync(path.join(ROOT, rel))) missing.push(`${screen}-${size}`);
+    }
+  }
+  if (missing.length) {
+    fail('deliverables', `store/screenshots/${lang}/ is missing ${missing.length}: ${missing.join(', ')}`);
+  }
 }
 
 /* ------------------------------------------------------------------ */

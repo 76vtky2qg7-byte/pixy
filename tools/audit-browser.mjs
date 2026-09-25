@@ -154,15 +154,14 @@ async function openAt(size, lang) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('request', (r) => requests.push(r.url()));
+  // The context locale decides the language: with no SDK the platform reads
+  // it from the browser. Writing the save instead would be too late - setLang
+  // has already run by the time a screen exists - and the audit would then
+  // check the Russian layout twice while calling one of the runs English.
   await page.goto(BASE + '/', { waitUntil: 'load' });
   await page.waitForSelector('#ui-root .screen', { timeout: 20000 });
   await page.evaluate(SEED);
-  if (lang === 'en') {
-    await page.evaluate(() => {
-      window.__app.save.update((d) => { d.settings.lang = 'en'; });
-      window.__app.show('menu');
-    });
-  }
+  await page.evaluate(() => window.__app.show('menu'));
   await page.waitForTimeout(400);
   return { ctx, page, errors, requests, failed };
 }

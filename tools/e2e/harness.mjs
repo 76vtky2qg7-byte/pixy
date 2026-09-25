@@ -20,14 +20,14 @@ export async function newBrowser() {
  * Open the game with a fake SDK injected and console/page errors collected.
  * `storage` seeds localStorage before boot, which is how the reload tests work.
  */
-export async function openGame(browser, { sdk = {}, device = 'phone', storage = null } = {}) {
+export async function openGame(browser, { sdk = {}, device = 'phone', storage = null, lang = 'ru' } = {}) {
   const d = DEVICES[device];
   const ctx = await browser.newContext({
     viewport: { width: d.width, height: d.height },
     deviceScaleFactor: d.dsf,
     hasTouch: device.startsWith('phone'),
     isMobile: device.startsWith('phone'),
-    locale: 'ru-RU',
+    locale: lang === 'en' ? 'en-US' : 'ru-RU',
   });
   const errors = [];
   const page = await ctx.newPage();
@@ -36,7 +36,10 @@ export async function openGame(browser, { sdk = {}, device = 'phone', storage = 
   });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
-  await page.addInitScript(fakeSdkScript(sdk));
+  // The language has to come from the host before boot: the app reads it
+  // from the platform, and a save written afterwards is too late, because
+  // setLang has already run by then.
+  await page.addInitScript(fakeSdkScript({ lang, ...sdk }));
   if (storage) {
     await page.addInitScript((s) => {
       for (const [k, v] of Object.entries(s)) window.localStorage.setItem(k, v);

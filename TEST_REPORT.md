@@ -10,8 +10,8 @@
 
 Three layers of checking, in order of how much they prove:
 
-1. **129 unit tests** (`npm test`) — adjacency, economy, saves, pause manager,
-   and the ad lifecycle.
+1. **137 unit tests** (`npm test`) — adjacency, economy, saves, pause manager,
+   the ad lifecycle, and what the game reports when no host is there to ask.
 2. **66 end-to-end checks** (`node tools/e2e/run.mjs`) — the **production
    build**, driven in Chromium, with a fake Yandex SDK injected before boot so
    the **real** shipped adapter is what runs.
@@ -29,7 +29,7 @@ in the last section, unrun.
 
 ---
 
-## 1. Unit tests — 129 passed
+## 1. Unit tests — 137 passed
 
 ```
 src/tests/grid.test.ts      24 passed
@@ -37,6 +37,7 @@ src/tests/economy.test.ts   29 passed
 src/tests/pause.test.ts     21 passed
 src/tests/save.test.ts      30 passed
 src/tests/ads.test.ts       25 passed
+src/tests/platform.test.ts   8 passed
 ```
 
 **Adjacency (24)** — orthogonal neighbours only; all four diagonal pairs on a
@@ -101,6 +102,12 @@ write leaves local progress untouched**; conflicts resolve by revision and
 **never sum two balances**; a burst of six writes coalesces into one upload.
 
 ---
+
+**Platform without a host (8)** — the null adapter follows the browser's
+language for English, its regional variants and a language the game does not
+ship; it survives having no `navigator`; it reports no cloud save, no
+purchases and no authorisation; ads come back `unavailable` rather than
+throwing; a cloud load returns nothing and a cloud save is a no-op.
 
 ## 2. End-to-end checks — 66 passed, 0 failed
 
@@ -399,7 +406,20 @@ Ordered by how they were caught.
    The result is a derivative, so the internal family name was changed and
    `ASSET_LICENSES.md` records what was altered.
 
-6. **The page title read `Искролом / Sparkscrapper`.** One title carrying two
+6. **An English browser got a Russian game whenever the SDK could not load.**
+   `NullPlatform` — the adapter that runs when the Yandex SDK is unreachable,
+   behind an ad blocker, or the build is opened outside the platform —
+   hardcoded `lang: 'ru'`. Nothing caught it because no test rendered a
+   screen, and the browser audit's ten "English" viewport runs were in fact
+   checking the Russian layout twice: they set the language by writing the
+   save, which happens long after `setLang` has already run at boot.
+
+   The adapter now reads the browser's own language, which is the only signal
+   available with no host. `src/tests/platform.test.ts` covers it, and the
+   audit and the media tooling drive the language through the browser locale
+   the way a real player's browser does.
+
+7. **The page title read `Искролом / Sparkscrapper`.** One title carrying two
    names with a slash reads as two games. It now follows the interface
    language — `Искролом` or `Sparkscrapper`, matching the name on each store
    card and on the menu screen — with the Russian name as the static default in
@@ -425,29 +445,29 @@ twice and compares pixels.
 
 ### Found by end-to-end checks
 
-7. **Two screens could be live at once.** Screens are code-split, so `show()`
+8. **Two screens could be live at once.** Screens are code-split, so `show()`
    mounts asynchronously; two calls in quick succession both appended their
    screen, because the second one's `clear()` ran before the first one's
    `import()` resolved. Mounts now carry a token and a superseded mount tears
    itself down. This is exactly the class of bug the 20-transition check exists
    to catch.
-8. **The tutorial silently died after the first screen change.** A screen change
+9. **The tutorial silently died after the first screen change.** A screen change
    clears `#ui-root`, detaching an open coach mark; the tutorial still believed
    a step was on screen and refused every later hint for the rest of the
    session. Added a screen-change hook, and a scrim so a pausing hint actually
    blocks what is under it (previously the player could start the wave out from
    under the hint, stranding a pause reason).
-9. **Losing wave one paid zero credits**, so the "double your credits" button
+10. **Losing wave one paid zero credits**, so the "double your credits" button
    offered to double nothing. Kills now pay, with a floor for any finished
    attempt, and the ad prompt is hidden entirely when there is nothing to
    double.
-10. **An SDK that never called back froze the game for 45 seconds.** The pause is
+11. **An SDK that never called back froze the game for 45 seconds.** The pause is
     now taken when the ad *opens*, not when it is *requested*, and a 6-second
     watchdog gives up if it never opens.
 
 ### Found while building the video, and worth fixing regardless
 
-11. **Tapping a filled cell explained the wrong thing.** Selecting a cell
+12. **Tapping a filled cell explained the wrong thing.** Selecting a cell
     previewed replacing it *with itself*, which produces an empty diff and
     rendered as "not connected to a weapon" — actively misleading for a module
     that was working perfectly. A tap now previews *removing* the part, which
@@ -456,19 +476,19 @@ twice and compares pixels.
     rate +25% → —". An empty diff also now distinguishes "this module touches
     no weapon" from "this changes nothing".
 
-12. **Hovering a shop card silently overrode an explicit cell selection**, so
+13. **Hovering a shop card silently overrode an explicit cell selection**, so
     the explanation panel described a part the player had not asked about. An
     explicit tap now outranks a passive hover, and moving off a card restores
     whatever the selection was showing.
 
-13. **The explanation sat below the shop**, so reading it scrolled the panel off
+14. **The explanation sat below the shop**, so reading it scrolled the panel off
     screen — and on the way, a shop card slid under the cursor and replaced the
     diff. It now renders directly under the panel, so the link and the numbers
     are visible together without scrolling.
 
 ### Found by external code review, then fixed and tested here
 
-14. **The SDK was loaded from the wrong URL.** The adapter used
+15. **The SDK was loaded from the wrong URL.** The adapter used
     `https://yandex.ru/games/sdk/v2`. A build served by Yandex from a ZIP
     exposes the SDK at the root path **`/sdk.js`**. This would have failed at
     the first hurdle in a real draft, and no amount of local testing would have
@@ -476,17 +496,17 @@ twice and compares pixels.
     `/sdk.js`, with the self-hosted form exported alongside it, and the packer
     asserts the built bundle actually references it.
 
-15. **The pause could be released while an ad was still on screen.** A 45-second
+16. **The pause could be released while an ad was still on screen.** A 45-second
     watchdog resolved the promise, and the caller cleared the `ad` pause in a
     `finally`. Any rewarded video longer than 45 seconds would have resumed the
     game — sound, simulation and all — underneath the ad.
 
-16. **A late `onOpen` could freeze the game permanently.** After the 6-second
+17. **A late `onOpen` could freeze the game permanently.** After the 6-second
     open timeout the promise resolved and the caller cleared the `ad` pause. If
     the host then opened the ad, `onOpen` set the pause again with nothing left
     to clear it. The game would sit paused forever.
 
-17. **A finished request released the in-flight guard while its ad was still
+18. **A finished request released the in-flight guard while its ad was still
     up**, so a second tap could stack a second ad; and a stale request's late
     callbacks could resolve a newer request.
 
@@ -498,28 +518,28 @@ twice and compares pixels.
     as a real recovery signal when `onClose` is lost, with a long backstop only
     for a host that provides neither.
 
-18. **The game did not work offline, while the store card said it did.** See the
+19. **The game did not work offline, while the store card said it did.** See the
     offline section above.
 
 ### Found by the balance harness
 
-19. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
+20. **Flat armour reduced fast weapons to 1 damage.** A 4-armour Bulwark turned
     the Cutter Beam's 2.6-damage tick into 1, which reads as the weapon being
     broken rather than as a reason to fit a Piston. Armour now floors at 25% of
     the raw hit.
-20. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
+21. **Boss slams were undodgeable.** Radius 112 with a 1.05s telegraph demands
     117 px/s from a 126 px/s robot — technically possible, practically not.
     Telegraph geometry is now derived from player speed.
-21. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
+22. **The Arc Sovereign's bullet ring had a 1-in-14 gap** the player could not
     find. The gap now widens with the volley count.
-22. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
+23. **Tier scaling was too steep**; contract 3 was gated on maxed permanent
     upgrades rather than on build quality. Reduced.
-23. **Scrap left on the floor was lost** when the wave timer expired. It is now
+24. **Scrap left on the floor was lost** when the wave timer expired. It is now
     swept into the total on a clear.
 
 ### Found by unit tests
 
-24. Nothing — the unit tests were written after the code and all passed on first
+25. Nothing — the unit tests were written after the code and all passed on first
     run, except one case where **the test was wrong** (it assumed the event
     emitter would store the same function reference twice; a `Set` deduplicates
     it). The behaviour is now pinned by a test that documents it.

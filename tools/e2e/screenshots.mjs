@@ -3,12 +3,15 @@
  * Every image here is a genuine frame of the running game.
  */
 import fs from 'node:fs';
-import { dismissCoach, newBrowser, openGame, playFor, tap } from './harness.mjs';
+import { dismissCoach, newBrowser, openGame, playFor } from './harness.mjs';
 
-const OUT = process.env.SHOT_DIR || 'store/screenshots';
-fs.mkdirSync(OUT, { recursive: true });
+const ROOT = process.env.SHOT_DIR || 'store/screenshots';
 
 const b = await newBrowser();
+
+/** Two phone sizes and one desktop, in both interface languages. */
+const LAYOUTS = [['phone', '390x844'], ['phoneSmall', '360x800'], ['laptop', '1366x768']];
+const LANGS = ['ru', 'en'];
 
 /** Skip the tutorial and drop straight into a configured run. */
 async function setup(page, { contract = 'night_shift', wave = 0, slots = null, scrap = 220 } = {}) {
@@ -36,8 +39,11 @@ async function setup(page, { contract = 'night_shift', wave = 0, slots = null, s
 
 const FULL = ['riveter', 'battery', 'buzzsaw', 'coil', 'mortar', 'targeter'];
 
-for (const [device, tag] of [['phone', '390x844'], ['phoneSmall', '360x800'], ['laptop', '1366x768']]) {
-  const { page, ctx } = await openGame(b, { device });
+for (const lang of LANGS) {
+ const OUT = `${ROOT}/${lang}`;
+ fs.mkdirSync(OUT, { recursive: true });
+ for (const [device, tag] of LAYOUTS) {
+  const { page, ctx } = await openGame(b, { device, lang });
 
   // 1. Menu
   await page.evaluate(() => {
@@ -52,7 +58,7 @@ for (const [device, tag] of [['phone', '390x844'], ['phoneSmall', '360x800'], ['
 
   // 2. Combat, mid wave, full panel
   await setup(page, { contract: 'foundry_rush', wave: 4, slots: FULL });
-  await tap(page, 'Начать волну');
+  await page.evaluate(() => window.__app.startWave());
   await playFor(page, 11, 'KeyD');
   await page.screenshot({ path: `${OUT}/2-combat-${tag}.png` });
 
@@ -67,7 +73,7 @@ for (const [device, tag] of [['phone', '390x844'], ['phoneSmall', '360x800'], ['
   await page.evaluate(() => { window.__app.quitToMenu(); });
   await page.waitForTimeout(400);
   await setup(page, { contract: 'night_shift', wave: 5, slots: FULL });
-  await tap(page, 'Начать волну');
+  await page.evaluate(() => window.__app.startWave());
   await playFor(page, 9, 'KeyA');
   await page.screenshot({ path: `${OUT}/4-boss-${tag}.png` });
 
@@ -82,6 +88,7 @@ for (const [device, tag] of [['phone', '390x844'], ['phoneSmall', '360x800'], ['
   await page.screenshot({ path: `${OUT}/6-contracts-${tag}.png` });
 
   await ctx.close();
-  console.log(`captured ${tag}`);
+  console.log(`captured ${lang} ${tag}`);
+ }
 }
 await b.close();

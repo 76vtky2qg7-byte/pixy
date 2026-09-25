@@ -120,9 +120,19 @@ export class MockPlatform implements Platform {
 export class NullPlatform implements Platform {
   readonly adVisible = false;
   readonly info: PlatformInfo = {
-    name: 'none', lang: 'ru', isMobile: false,
+    name: 'none',
+    // With no host to ask, the browser's own language is the only signal
+    // there is. Hardcoding 'ru' here handed an English speaker a Russian
+    // game whenever the SDK could not load.
+    lang: NullPlatform.browserLang(),
+    isMobile: false,
     isAuthorized: false, hasCloudSave: false, hasPurchases: false,
   };
+
+  private static browserLang(): 'ru' | 'en' {
+    const raw = (globalThis.navigator?.language ?? 'ru').toLowerCase();
+    return raw.startsWith('en') ? 'en' : 'ru';
+  }
   ready(): void {}
   gameplayStart(): void {}
   gameplayStop(): void {}

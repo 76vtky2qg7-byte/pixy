@@ -31,11 +31,27 @@ fs.rmSync(RAW, { recursive: true, force: true });
 fs.mkdirSync(RAW, { recursive: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-/** Which layouts to record. Portrait is the primary one the game is built for. */
+/**
+ * Which layouts to record, and in which language.
+ *
+ * Portrait is the primary one the game is built for; the landscape pair is
+ * what a store card asks for. The language comes from the SDK, the same way
+ * the game gets it on the platform.
+ */
 const LAYOUTS = [
-  { name: 'portrait-390x844', viewport: { width: 390, height: 844 }, touch: true, stick: { x: 95, y: 640 } },
-  { name: 'desktop-1366x768', viewport: { width: 1366, height: 768 }, touch: false, stick: { x: 250, y: 560 } },
+  { name: 'portrait-390x844-ru', lang: 'ru', viewport: { width: 390, height: 844 }, touch: true, stick: { x: 95, y: 640 } },
+  { name: 'portrait-390x844-en', lang: 'en', viewport: { width: 390, height: 844 }, touch: true, stick: { x: 95, y: 640 } },
+  { name: 'landscape-1366x768-ru', lang: 'ru', viewport: { width: 1366, height: 768 }, touch: false, stick: { x: 250, y: 560 } },
+  { name: 'landscape-1366x768-en', lang: 'en', viewport: { width: 1366, height: 768 }, touch: false, stick: { x: 250, y: 560 } },
 ];
+
+/** Captions the script clicks, per language. */
+const CAPTION = {
+  ru: { play: 'Играть', contract: 'Литейный аврал', accept: 'Принять контракт',
+        startWave: 'Начать волну', buy: /^Купить$/ },
+  en: { play: 'Play', contract: 'Foundry Rush', accept: 'Accept contract',
+        startWave: 'Start wave', buy: /^Buy$/ },
+};
 
 /**
  * Page-side autopilot.
@@ -132,7 +148,7 @@ for (const layout of LAYOUTS) {
     deviceScaleFactor: layout.touch ? 2 : 1,
     hasTouch: layout.touch,
     isMobile: layout.touch,
-    locale: 'ru-RU',
+    locale: layout.lang === 'en' ? 'en-US' : 'ru-RU',
     recordVideo: { dir: RAW, size: layout.viewport },
   });
   const page = await ctx.newPage();
@@ -145,6 +161,10 @@ for (const layout of LAYOUTS) {
   };
   const wait = (ms) => page.waitForTimeout(ms);
 
+  const T = CAPTION[layout.lang];
+  // The context locale is set above, and with no SDK the platform follows
+  // it, so the interface is already in the right language before the first
+  // frame is recorded.
   await page.goto(BASE + '/', { waitUntil: 'load' });
   await page.waitForSelector('#ui-root .screen', { timeout: 20000 });
 
@@ -163,10 +183,10 @@ for (const layout of LAYOUTS) {
   await wait(1300);
 
   /* ---- 0:00 menu -> contract ---- */
-  await tap('Играть', 650);
-  await page.locator('#ui-root .card', { hasText: 'Литейный аврал' }).first().click();
+  await tap(T.play, 650);
+  await page.locator('#ui-root .card', { hasText: T.contract }).first().click();
   await wait(850);
-  await tap('Принять контракт', 600);
+  await tap(T.accept, 600);
 
   /* ---- stage a dense mid-contract wave with a single weapon ---- */
   await page.evaluate(() => {
@@ -179,7 +199,7 @@ for (const layout of LAYOUTS) {
     window.__app.show('prep');
   });
   await wait(800);
-  await tap('Начать волну', 350);
+  await tap(T.startWave, 350);
 
   /* ---- 0:04 combat ---- */
   await page.evaluate(autopilot(layout.stick.x, layout.stick.y));
@@ -209,7 +229,7 @@ for (const layout of LAYOUTS) {
     window.__app.show('prep');
   });
   await wait(1000);
-  await page.locator('#ui-root button', { hasText: /^Купить$/ }).first().click();
+  await page.locator('#ui-root button', { hasText: T.buy }).first().click();
   await wait(1500);
 
   /* ---- 0:15 the whole point: tap the Battery and read what it is doing.
@@ -221,7 +241,7 @@ for (const layout of LAYOUTS) {
   await wait(500);
 
   /* ---- 0:19 next wave, visibly faster ---- */
-  await tap('Начать волну', 350);
+  await tap(T.startWave, 350);
   await page.evaluate(() => window.__auto.start());
   await wait(5800);
 
@@ -249,7 +269,7 @@ for (const layout of LAYOUTS) {
   const dest = path.join(OUT, `gameplay-${layout.name}.webm`);
   fs.copyFileSync(raw, dest);
   const kb = (fs.statSync(dest).size / 1024).toFixed(0);
-  console.log(`store/video/gameplay-${layout.name}.webm  ${kb} KB  ${layout.viewport.width}x${layout.viewport.height}`);
+  console.log(`store/video/gameplay-${layout.name}.webm  ${kb} KB  ${layout.viewport.width}x${layout.viewport.height}  ${layout.lang}`);
   if (errors.length) console.log('  page errors:', errors);
   else console.log('  no page errors during recording');
 }
